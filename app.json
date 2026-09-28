@@ -1,0 +1,70 @@
+{
+  "expo": {
+    "name": "Market Mapper",
+    "slug": "market-mapper",
+    "version": "1.0.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "scheme": "marketmapper",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#059669"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.marketmapper.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Market Mapper requires location access to map business coordinates and record market footpaths accurately in the field.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Background location access is required to accurately record uninterrupted footpaths through market corridors when the screen is dimmed.",
+        "NSCameraUsageDescription": "Market Mapper requires camera access to capture storefront photos, landmarks, and catalogue suggestions in the field."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#059669"
+      },
+      "package": "com.marketmapper.app",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "POST_NOTIFICATIONS",
+        "RECEIVE_BOOT_COMPLETED"
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "${GOOGLE_MAPS_API_KEY}"
+        }
+      }
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Market Mapper to record path coordinates while surveying market corridors."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Market Mapper to capture business storefront and landmark photos."
+        }
+      ],
+      "expo-notifications",
+      "expo-sqlite",
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

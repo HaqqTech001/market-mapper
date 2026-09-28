@@ -1,0 +1,6 @@
+{
+  "name": "Market Mapper",
+  "description": "Internal field mapping tool for market surveys, path recording, business inventory, mission dispatch, and team collaboration.",
+  "requestFramePermissions": ["geolocation", "camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
