@@ -9,13 +9,29 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.marketmapper.app"
+      "bundleIdentifier": "com.marketmapper.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Market Mapper uses your location to capture businesses, places and market paths.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Market Mapper can continue an active path recording when background field mapping is enabled."
+      }
     },
     "android": {
-      "package": "com.marketmapper.app"
+      "package": "com.marketmapper.app",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow Market Mapper to use your location while mapping markets.",
+          "locationAlwaysAndWhenInUsePermission": "Allow Market Mapper to continue recording an active market path when background location is enabled."
+        }
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true
