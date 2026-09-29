@@ -448,13 +448,18 @@ export class LocalWebStorageAdapter implements DatabaseAdapter {
 }
 
 // Global Singleton Adapter
-let dbAdapter: LocalWebStorageAdapter | null = null;
+let dbAdapter: DatabaseAdapter | null = null;
 let isInitialized = false;
 
-export function getDatabase(): DatabaseAdapter {
-  if (!dbAdapter) {
-    dbAdapter = new LocalWebStorageAdapter();
+export function setDatabaseAdapter(adapter: DatabaseAdapter): void {
+  if (isInitialized) {
+    throw new Error('Database adapter cannot be replaced after initialization.');
   }
+  dbAdapter = adapter;
+}
+
+export function getDatabase(): DatabaseAdapter {
+  if (!dbAdapter) dbAdapter = new LocalWebStorageAdapter();
   return dbAdapter;
 }
 
@@ -606,9 +611,7 @@ export async function getDatabaseStats(): Promise<{
  * Development database reset helper
  */
 export async function resetDatabase(): Promise<void> {
-  if (dbAdapter instanceof LocalWebStorageAdapter) {
-    dbAdapter.clearAll();
-  }
+  if (dbAdapter instanceof LocalWebStorageAdapter) dbAdapter.clearAll();
   isInitialized = false;
   await initializeDatabase();
 }
