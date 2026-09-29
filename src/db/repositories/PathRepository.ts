@@ -25,7 +25,7 @@ import { calculatePolylineDistanceMeters } from '../../lib/location/gpsQuality';
 import { generateDefaultBranchesForType } from '../../lib/junctions/branchManager';
 
 export class PathRepository {
-  private static db = getDatabase();
+  private static get db() { return getDatabase(); }
 
   /**
    * Starts a new active path recording session in SQLite
