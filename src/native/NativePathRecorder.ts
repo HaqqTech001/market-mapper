@@ -6,7 +6,7 @@ type RecorderSnapshot = {
   sessionId: string | null;
   segmentId: string | null;
   missionId: string | null;
-  status: 'idle' | 'recording' | 'paused';
+  status: 'idle' | 'recording' | 'paused' | 'reviewing';
   movementState: MovementState;
   distanceMeters: number;
   sequenceNumber: number;
@@ -132,7 +132,40 @@ export class NativePathRecorder {
     this.refreshDurations();
     this.snapshot.activeStartedAtMs = null;
     await PathRepository.updateSessionTelemetry(this.snapshot.sessionId, this.snapshot.distanceMeters, this.snapshot.durationSeconds, this.snapshot.activeDurationSeconds, 0, false, 'reviewing');
+    this.snapshot.status = 'reviewing';
     return this.getSnapshot();
+  }
+
+  async save(userId: string, name?: string) {
+    if (!this.snapshot.sessionId || !this.snapshot.missionId || this.snapshot.status !== 'reviewing') {
+      throw new Error('Path must be in review before it can be saved.');
+    }
+    const recovered = await PathRepository.getRawPointsForSession(this.snapshot.sessionId);
+    const accepted = recovered.filter((p) => p.accepted);
+    const now = new Date().toISOString();
+    const pathId = `path_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const path = await PathRepository.finalizePath({
+      id: pathId,
+      sessionId: this.snapshot.sessionId,
+      missionId: this.snapshot.missionId,
+      name: name?.trim() || `Mapped path ${new Date().toLocaleString()}`,
+      distanceMeters: this.snapshot.distanceMeters,
+      durationSeconds: this.snapshot.durationSeconds,
+      junctionsCount: 0,
+      rawPoints: accepted.map((p) => ({ latitude: p.latitude, longitude: p.longitude, timestamp: p.timestamp, accuracy: p.accuracy, speed: p.speed ?? undefined, heading: p.heading ?? undefined })),
+      isVerified: false,
+      version: 1,
+      createdBy: userId,
+      updatedBy: userId,
+      createdAt: now,
+      updatedAt: now,
+      clientCreatedAt: now,
+      isDeleted: false,
+      syncStatus: 'local_only',
+    }, this.snapshot.sessionId);
+    this.detector.reset();
+    this.snapshot = { sessionId: null, segmentId: null, missionId: null, status: 'idle', movementState: 'SEARCHING', distanceMeters: 0, sequenceNumber: 0, startedAtMs: null, activeStartedAtMs: null, activeDurationSeconds: 0, durationSeconds: 0, acceptedPoints: [] };
+    return path;
   }
 
   async discard(): Promise<void> {
