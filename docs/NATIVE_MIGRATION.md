@@ -30,3 +30,23 @@ Not yet implemented:
 - native ports of mapping workflows
 
 Those are subsequent controlled stages.
+
+
+## Native path recorder checkpoint
+
+Implemented on the migration branch:
+- Expo Location foreground GPS stream
+- react-native-maps authoritative field renderer
+- existing movement detector reused for stationary drift / movement acceptance
+- every raw GPS sample persisted to Expo SQLite while recording
+- multi-segment Pause / Resume
+- unfinished session recovery
+- Finish -> Review separation
+- Save -> finalized local path + existing outbox queue
+- explicit confirmed Discard
+
+Integration blockers before production use:
+- replace temporary native field mission ID with authenticated selected mission context
+- replace temporary save owner with authenticated profile ID
+- wire correction controls (undo distance/time, trim, restart from junction) into native Review UI
+- physical Android GPS/recovery validation remains required
