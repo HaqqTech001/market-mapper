@@ -20,7 +20,9 @@
     "react-native": "0.86.0",
     "expo-status-bar": "~57.0.1",
     "expo-sqlite": "~57.0.3",
-    "expo-secure-store": "~57.0.1"
+    "expo-secure-store": "~57.0.1",
+    "react-native-maps": "1.27.2",
+    "expo-location": "~57.0.3"
   },
   "devDependencies": {
     "@types/react": "^19.2.0",
