@@ -20,11 +20,11 @@ export class ExpoSQLiteAdapter implements DatabaseAdapter {
   }
 
   getAllAsync<T = unknown>(sql: string, params: unknown[] = []): Promise<T[]> {
-    return this.db.getAllAsync<T>(sql, ...(params as SQLiteBindValue[]));
+    return this.db.getAllAsync(sql, ...(params as SQLiteBindValue[])) as Promise<T[]>;
   }
 
   getFirstAsync<T = unknown>(sql: string, params: unknown[] = []): Promise<T | null> {
-    return this.db.getFirstAsync<T>(sql, ...(params as SQLiteBindValue[]));
+    return this.db.getFirstAsync(sql, ...(params as SQLiteBindValue[])) as Promise<T | null>;
   }
 }
 
