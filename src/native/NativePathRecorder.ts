@@ -10,6 +10,10 @@ type RecorderSnapshot = {
   movementState: MovementState;
   distanceMeters: number;
   sequenceNumber: number;
+  startedAtMs: number | null;
+  activeStartedAtMs: number | null;
+  activeDurationSeconds: number;
+  durationSeconds: number;
   acceptedPoints: RawGpsSample[];
 };
 
@@ -17,7 +21,7 @@ export class NativePathRecorder {
   private detector = new MovementDetector();
   private snapshot: RecorderSnapshot = {
     sessionId: null, segmentId: null, missionId: null, status: 'idle',
-    movementState: 'SEARCHING', distanceMeters: 0, sequenceNumber: 0, acceptedPoints: [],
+    movementState: 'SEARCHING', distanceMeters: 0, sequenceNumber: 0, startedAtMs: null, activeStartedAtMs: null, activeDurationSeconds: 0, durationSeconds: 0, acceptedPoints: [],
   };
 
   getSnapshot(): RecorderSnapshot { return { ...this.snapshot, acceptedPoints: [...this.snapshot.acceptedPoints] }; }
@@ -28,7 +32,7 @@ export class NativePathRecorder {
     await PathRepository.startSession(sessionId, missionId);
     const segment = await PathRepository.createSegment(sessionId, 0);
     this.detector.reset();
-    this.snapshot = { sessionId, segmentId: segment.id, missionId, status: 'recording', movementState: 'SEARCHING', distanceMeters: 0, sequenceNumber: 0, acceptedPoints: [] };
+    this.snapshot = { sessionId, segmentId: segment.id, missionId, status: 'recording', movementState: 'SEARCHING', distanceMeters: 0, sequenceNumber: 0, startedAtMs: Date.now(), activeStartedAtMs: Date.now(), activeDurationSeconds: 0, durationSeconds: 0, acceptedPoints: [] };
     return this.getSnapshot();
   }
 
@@ -60,15 +64,18 @@ export class NativePathRecorder {
     this.snapshot.movementState = evaluation.movementState;
     this.snapshot.distanceMeters += evaluation.distanceAddedToPathMeters;
     if (sample.accepted) this.snapshot.acceptedPoints.push(sample);
-    await PathRepository.updateSessionTelemetry(this.snapshot.sessionId, this.snapshot.distanceMeters, 0, 0, 0, false);
+    this.refreshDurations();
+    await PathRepository.updateSessionTelemetry(this.snapshot.sessionId, this.snapshot.distanceMeters, this.snapshot.durationSeconds, this.snapshot.activeDurationSeconds, 0, false);
     return this.getSnapshot();
   }
 
   async pause(): Promise<RecorderSnapshot> {
     if (this.snapshot.status !== 'recording' || !this.snapshot.sessionId || !this.snapshot.segmentId) return this.getSnapshot();
     await PathRepository.closeSegment(this.snapshot.segmentId);
+    this.refreshDurations();
+    this.snapshot.activeStartedAtMs = null;
     this.snapshot.status = 'paused';
-    await PathRepository.updateSessionTelemetry(this.snapshot.sessionId, this.snapshot.distanceMeters, 0, 0, 0, true);
+    await PathRepository.updateSessionTelemetry(this.snapshot.sessionId, this.snapshot.distanceMeters, this.snapshot.durationSeconds, this.snapshot.activeDurationSeconds, 0, true);
     return this.getSnapshot();
   }
 
@@ -80,7 +87,57 @@ export class NativePathRecorder {
     this.detector.reset();
     this.snapshot.segmentId = segment.id;
     this.snapshot.status = 'recording';
-    await PathRepository.updateSessionTelemetry(this.snapshot.sessionId, this.snapshot.distanceMeters, 0, 0, 0, false);
+    this.snapshot.activeStartedAtMs = Date.now();
+    this.refreshDurations();
+    await PathRepository.updateSessionTelemetry(this.snapshot.sessionId, this.snapshot.distanceMeters, this.snapshot.durationSeconds, this.snapshot.activeDurationSeconds, 0, false);
     return this.getSnapshot();
+  }
+
+  private refreshDurations(): void {
+    const now = Date.now();
+    if (this.snapshot.startedAtMs) this.snapshot.durationSeconds = Math.max(0, Math.floor((now - this.snapshot.startedAtMs) / 1000));
+    if (this.snapshot.activeStartedAtMs) {
+      const elapsed = Math.max(0, Math.floor((now - this.snapshot.activeStartedAtMs) / 1000));
+      this.snapshot.activeDurationSeconds += elapsed;
+      this.snapshot.activeStartedAtMs = now;
+    }
+  }
+
+  async recover(): Promise<RecorderSnapshot> {
+    const recovered = await PathRepository.getActiveSession();
+    if (!recovered.session) return this.getSnapshot();
+    const accepted = recovered.points.filter((p) => p.accepted);
+    const open = [...recovered.segments].reverse().find((s) => !s.isClosed);
+    this.detector.reset();
+    this.snapshot = {
+      sessionId: recovered.session.sessionId,
+      segmentId: open?.id ?? null,
+      missionId: recovered.session.missionId,
+      status: recovered.session.isPaused ? 'paused' : 'recording',
+      movementState: 'SEARCHING',
+      distanceMeters: recovered.session.distanceMeters,
+      sequenceNumber: recovered.points.reduce((m, p) => Math.max(m, p.sequenceNumber), 0),
+      startedAtMs: Date.parse(recovered.session.startedAt),
+      activeStartedAtMs: recovered.session.isPaused ? null : Date.now(),
+      activeDurationSeconds: recovered.session.activeDurationSeconds,
+      durationSeconds: recovered.session.durationSeconds,
+      acceptedPoints: accepted,
+    };
+    return this.getSnapshot();
+  }
+
+  async finish(): Promise<RecorderSnapshot> {
+    if (!this.snapshot.sessionId || this.snapshot.status === 'idle') return this.getSnapshot();
+    if (this.snapshot.segmentId && this.snapshot.status === 'recording') await PathRepository.closeSegment(this.snapshot.segmentId);
+    this.refreshDurations();
+    this.snapshot.activeStartedAtMs = null;
+    await PathRepository.updateSessionTelemetry(this.snapshot.sessionId, this.snapshot.distanceMeters, this.snapshot.durationSeconds, this.snapshot.activeDurationSeconds, 0, false, 'reviewing');
+    return this.getSnapshot();
+  }
+
+  async discard(): Promise<void> {
+    if (this.snapshot.sessionId) await PathRepository.discardActiveSession(this.snapshot.sessionId);
+    this.detector.reset();
+    this.snapshot = { sessionId: null, segmentId: null, missionId: null, status: 'idle', movementState: 'SEARCHING', distanceMeters: 0, sequenceNumber: 0, startedAtMs: null, activeStartedAtMs: null, activeDurationSeconds: 0, durationSeconds: 0, acceptedPoints: [] };
   }
 }
