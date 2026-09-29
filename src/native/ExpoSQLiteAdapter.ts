@@ -1,4 +1,4 @@
-import type { SQLiteDatabase } from 'expo-sqlite';
+import type { SQLiteBindValue, SQLiteDatabase } from 'expo-sqlite';
 import type { DatabaseAdapter } from '@/src/db/sqlite';
 import { getNativeDatabase } from './database';
 
@@ -12,7 +12,7 @@ export class ExpoSQLiteAdapter implements DatabaseAdapter {
   }
 
   async runAsync(sql: string, params: unknown[] = []): Promise<RunResult> {
-    const result = await this.db.runAsync(sql, ...(params as SQLite.SQLiteBindValue[]));
+    const result = await this.db.runAsync(sql, ...(params as SQLiteBindValue[]));
     return {
       lastInsertRowId: Number(result.lastInsertRowId ?? 0),
       changes: Number(result.changes ?? 0),
@@ -20,11 +20,11 @@ export class ExpoSQLiteAdapter implements DatabaseAdapter {
   }
 
   getAllAsync<T = unknown>(sql: string, params: unknown[] = []): Promise<T[]> {
-    return this.db.getAllAsync<T>(sql, ...(params as SQLite.SQLiteBindValue[]));
+    return this.db.getAllAsync<T>(sql, ...(params as SQLiteBindValue[]));
   }
 
   getFirstAsync<T = unknown>(sql: string, params: unknown[] = []): Promise<T | null> {
-    return this.db.getFirstAsync<T>(sql, ...(params as SQLite.SQLiteBindValue[]));
+    return this.db.getFirstAsync<T>(sql, ...(params as SQLiteBindValue[]));
   }
 }
 
