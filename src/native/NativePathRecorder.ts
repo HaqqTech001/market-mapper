@@ -136,6 +136,39 @@ export class NativePathRecorder {
     return this.getSnapshot();
   }
 
+
+  async undoDistance(meters: number) {
+    if (this.snapshot.status !== 'reviewing' || !this.snapshot.sessionId) throw new Error('Path must be in review before correcting it.');
+    await PathRepository.applyUndoDistance(this.snapshot.sessionId, meters);
+    await this.reloadReviewGeometry();
+  }
+
+  async undoTime(seconds: number) {
+    if (this.snapshot.status !== 'reviewing' || !this.snapshot.sessionId) throw new Error('Path must be in review before correcting it.');
+    await PathRepository.applyUndoTime(this.snapshot.sessionId, seconds);
+    await this.reloadReviewGeometry();
+  }
+
+  async trimStart(meters: number) {
+    if (this.snapshot.status !== 'reviewing' || !this.snapshot.sessionId) throw new Error('Path must be in review before correcting it.');
+    await PathRepository.trimStartMeters(this.snapshot.sessionId, meters);
+    await this.reloadReviewGeometry();
+  }
+
+  async trimEnd(meters: number) {
+    if (this.snapshot.status !== 'reviewing' || !this.snapshot.sessionId) throw new Error('Path must be in review before correcting it.');
+    await PathRepository.trimEndMeters(this.snapshot.sessionId, meters);
+    await this.reloadReviewGeometry();
+  }
+
+  private async reloadReviewGeometry() {
+    if (!this.snapshot.sessionId) return;
+    const raw = await PathRepository.getRawPointsForSession(this.snapshot.sessionId);
+    const accepted = raw.filter((p) => p.accepted).sort((a,b)=>a.sequenceNumber-b.sequenceNumber);
+    const distance = accepted.slice(1).reduce((sum,p,i)=>sum + distanceMeters(accepted[i],p),0);
+    this.snapshot = { ...this.snapshot, acceptedPoints: accepted.map(p=>({latitude:p.latitude,longitude:p.longitude})), sequence: raw.length, distanceMeters: distance };
+  }
+
   async save(userId: string, name?: string) {
     if (!this.snapshot.sessionId || !this.snapshot.missionId || this.snapshot.status !== 'reviewing') {
       throw new Error('Path must be in review before it can be saved.');
@@ -174,3 +207,5 @@ export class NativePathRecorder {
     this.snapshot = { sessionId: null, segmentId: null, missionId: null, status: 'idle', movementState: 'SEARCHING', distanceMeters: 0, sequenceNumber: 0, startedAtMs: null, activeStartedAtMs: null, activeDurationSeconds: 0, durationSeconds: 0, acceptedPoints: [] };
   }
 }
+
+function distanceMeters(a:{latitude:number;longitude:number},b:{latitude:number;longitude:number}){const R=6371000;const toRad=(d:number)=>d*Math.PI/180;const dLat=toRad(b.latitude-a.latitude),dLon=toRad(b.longitude-a.longitude);const x=Math.sin(dLat/2)**2+Math.cos(toRad(a.latitude))*Math.cos(toRad(b.latitude))*Math.sin(dLon/2)**2;return 2*R*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));}
