@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { initializeNativeDatabase } from '@/src/native/database';
+import { OperationalRealtimeLifecycle } from '@/src/native/OperationalRealtimeLifecycle';
 
 export default function RootLayout() {
   const [state, setState] = useState<'booting' | 'ready' | 'error'>('booting');
@@ -38,6 +39,7 @@ export default function RootLayout() {
 
   return (
     <>
+      <OperationalRealtimeLifecycle />
       <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false }} />
     </>
