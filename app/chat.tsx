@@ -4,12 +4,13 @@ import { router, useFocusEffect } from 'expo-router';
 import { ChatRepository } from '@/src/db/repositories/ChatRepository';
 import { getAssignedNativeMissions, requireNativeUserContext, type NativeUserContext } from '@/src/native/userContext';
 import { runNativeSync } from '@/src/native/syncCoordinator';
+import { subscribeOperationalData } from '@/src/native/operationalEvents';
 import type { ChatChannel, ChatMessage } from '@/src/types';
 
 export default function ChatScreen(){
  const [user,setUser]=useState<NativeUserContext|null>(null); const [channels,setChannels]=useState<ChatChannel[]>([]); const [active,setActive]=useState<ChatChannel|null>(null); const [messages,setMessages]=useState<ChatMessage[]>([]); const [text,setText]=useState(''); const [loading,setLoading]=useState(true);
  const loadChannels=useCallback(async()=>{const all=await ChatRepository.getAllChannels();setChannels(all);if(active){setMessages(await ChatRepository.getMessages(active.id))}},[active]);
- useFocusEffect(useCallback(()=>{loadChannels()},[loadChannels]));
+ useFocusEffect(useCallback(()=>{loadChannels();return subscribeOperationalData(()=>{loadChannels()})},[loadChannels]));
  useEffect(()=>{let mounted=true;(async()=>{try{const u=await requireNativeUserContext();if(!mounted)return;setUser(u);const missions=await getAssignedNativeMissions(u.userId);for(const m of missions)await ChatRepository.getOrCreateChannel(m.title+' Comms','mission',undefined,m.id);await loadChannels()}finally{if(mounted)setLoading(false)}})();return()=>{mounted=false}},[]);
  const open=async(c:ChatChannel)=>{setActive(c);setMessages(await ChatRepository.getMessages(c.id))};
  const send=async()=>{if(!user||!active||!text.trim())return;const body=text.trim();setText('');await ChatRepository.sendMessage({channelId:active.id,senderId:user.userId,senderName:user.fullName,senderRole:user.role,text:body});setMessages(await ChatRepository.getMessages(active.id));runNativeSync().catch(()=>{})};
