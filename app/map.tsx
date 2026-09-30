@@ -9,6 +9,7 @@ import { savePlaceDuringPath, saveQuickBusiness, saveQuickJunction, saveQuickIss
 import { getAssignedNativeMissions, requireNativeUserContext, type NativeMissionContext, type NativeUserContext } from '@/src/native/userContext';
 import { NativeBusinessCapture, NativeIssueCapture, NativeJunctionPicker, NativePlaceCapture, type BusinessCaptureValue } from '@/src/native/NativeCaptureSheets';
 import { RemainingBranchesSheet } from '@/src/native/RemainingBranchesSheet';
+import { persistBusinessPhoto } from '@/src/native/businessMedia';
 import { PathRepository } from '@/src/db/repositories/PathRepository';
 
 const recorder = new NativePathRecorder();
@@ -166,7 +167,8 @@ export default function MapScreen() {
       <NativeBusinessCapture visible={capture === 'business'} onClose={() => setCapture(null)} onSave={async (value: BusinessCaptureValue) => {
         if (!current || !snapshot.missionId || !userContext) throw new Error('Mapping context is unavailable.');
         const before = recorder.getSnapshot().status;
-        await saveQuickBusiness({ missionId: snapshot.missionId, userId: userContext.userId, pathSessionId: snapshot.sessionId, latitude: current.latitude, longitude: current.longitude }, value);
+        const savedBusiness = await saveQuickBusiness({ missionId: snapshot.missionId, userId: userContext.userId, pathSessionId: snapshot.sessionId, latitude: current.latitude, longitude: current.longitude }, { ...value, photoDeclined: value.photoDeclined, localPhotoUri: value.photo?.localUri });
+        if (value.photo) await persistBusinessPhoto(userContext.userId, savedBusiness.id, value.photo);
         if (recorder.getSnapshot().status !== before) throw new Error('Business capture changed path state.');
         setCapture(null);
         Alert.alert('Business saved', 'Business and offerings saved locally. Path recording state was preserved.');
