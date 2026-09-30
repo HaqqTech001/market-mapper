@@ -1,7 +1,10 @@
 import { BusinessRepository } from '@/src/db/repositories/BusinessRepository';
 import { FieldIssueRepository } from '@/src/db/repositories/FieldIssueRepository';
 import { PathRepository } from '@/src/db/repositories/PathRepository';
-import type { Business, BusinessActivity, BusinessOfferingObservation, BusinessStability, BusinessType, CatalogueItemType, JunctionType, RelativeBusinessPosition } from '@/src/types';
+import { OutboxRepository } from '@/src/db/repositories/OutboxRepository';
+import { getDatabase } from '@/src/db/sqlite';
+import { generateDefaultBranchesForType } from '@/src/lib/junctions/branchManager';
+import type { Business, BusinessActivity, BusinessOfferingObservation, BusinessStability, BusinessType, CatalogueItemType, JunctionType, PlaceType, RelativeBusinessPosition } from '@/src/types';
 
 export type FieldCaptureContext = {
   missionId: string;
@@ -80,7 +83,7 @@ export async function saveQuickJunction(
   if (!active.session || active.session.sessionId !== context.pathSessionId) throw new Error('Active path session could not be verified.');
   const id = `junc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const label = `Junction J${String(active.junctions.length + 1).padStart(3, '0')}`;
-  await PathRepository.addJunction({
+  const junction = {
     id,
     sessionId: context.pathSessionId,
     operationalLabel: label,
@@ -96,8 +99,14 @@ export async function saveQuickJunction(
     sequenceNumber: active.points.reduce((m, p) => Math.max(m, p.sequenceNumber), 0),
     timestamp: Date.now(),
     createdAt: new Date().toISOString(),
-  });
-  return { id, operationalLabel: label };
+  };
+  await PathRepository.addJunction(junction);
+  const branches = generateDefaultBranchesForType(id, input.junctionType);
+  const db = getDatabase();
+  for (const branch of branches) {
+    await db.runAsync(`INSERT OR REPLACE INTO local_junction_branches (id, junction_id, label, relative_side, status, connected_path_id, connected_target_junction_id, notes, mapped_at, mapped_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`, [branch.id, branch.junctionId, branch.label, branch.relativeSide || null, branch.status, branch.connectedPathId || null, branch.connectedTargetJunctionId || null, branch.notes || null, branch.mappedAt || null, branch.mappedBy || null, new Date().toISOString()]);
+  }
+  return { id, operationalLabel: label, branches };
 }
 
 export async function saveQuickIssue(
@@ -114,4 +123,18 @@ export async function saveQuickIssue(
     latitude: context.latitude,
     longitude: context.longitude,
   });
+}
+
+
+export async function savePlaceDuringPath(context: FieldCaptureContext, input: { placeType: PlaceType; displayName?: string; description?: string }) {
+  if (!context.marketId) throw new Error('Market context is required to save a place.');
+  const db = getDatabase();
+  const id = `place_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+  const now = new Date().toISOString();
+  const labelPrefix: Record<PlaceType,string> = { gate_entrance:'Gate', junction:'Junction', landmark:'Landmark', facility_restroom:'Restroom', facility_water:'Water', facility_waste:'Waste', facility_power:'Power', transport_stop:'Transport', other:'Place' };
+  const label = `${labelPrefix[input.placeType]} ${id.slice(-4).toUpperCase()}`;
+  const payload = { id, marketId: context.marketId, areaId: context.areaId, operationalLabel: label, displayName: input.displayName, placeType: input.placeType, latitude: context.latitude, longitude: context.longitude, description: input.description, createdAt: now, updatedAt: now, isDeleted: false, syncStatus: 'local_only' };
+  await db.runAsync(`INSERT INTO local_market_places (id, market_id, area_id, operational_label, display_name, place_type, latitude, longitude, description, created_at, updated_at, is_deleted, sync_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'local_only');`, [id, context.marketId, context.areaId || null, label, input.displayName || null, input.placeType, context.latitude, context.longitude, input.description || null, now, now]);
+  await OutboxRepository.enqueue('local_market_places', id, 'INSERT', payload);
+  return payload;
 }
