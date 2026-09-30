@@ -1,31 +1,25 @@
-import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
+import { NotificationRepository } from '@/src/db/repositories/NotificationRepository';
+import { getAssignedNativeMissions, requireNativeUserContext, type NativeMissionSummary, type NativeUserContext } from '@/src/native/userContext';
+import { subscribeOperationalData } from '@/src/native/operationalEvents';
+import { getNativeSyncSnapshot, type NativeSyncSnapshot } from '@/src/native/syncCoordinator';
 
-export default function NativeFoundationScreen() {
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <Text style={styles.eyebrow}>MARKET MAPPER</Text>
-        <Text style={styles.title}>Native field app foundation</Text>
-        <Text style={styles.body}>
-          React Native + Expo is now the authoritative runtime on this migration branch.
-          Existing field workflows remain preserved in src while they are ported in controlled stages.
-        </Text>
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Stage 1</Text>
-          <Text style={styles.cardText}>Native shell established. No production field workflow has been claimed as migrated yet.</Text>
-        </View>
-      </View>
-    </SafeAreaView>
-  );
+export default function HomeScreen(){
+ const [user,setUser]=useState<NativeUserContext|null>(null);const [missions,setMissions]=useState<NativeMissionSummary[]>([]);const [unread,setUnread]=useState(0);const [sync,setSync]=useState<NativeSyncSnapshot|null>(null);const [loading,setLoading]=useState(true);
+ const load=useCallback(async()=>{try{const u=user||await requireNativeUserContext();setUser(u);setMissions(await getAssignedNativeMissions(u.userId));setUnread(await NotificationRepository.getUnreadCount(u.userId));setSync(await getNativeSyncSnapshot())}finally{setLoading(false)}},[user]);
+ useFocusEffect(useCallback(()=>{load();return subscribeOperationalData(()=>load())},[load]));
+ useEffect(()=>{load()},[]);
+ if(loading)return <View style={s.center}><ActivityIndicator/><Text style={s.help}>Preparing field workspace…</Text></View>;
+ if(!user)return <View style={s.center}><Text style={s.title}>Sign in required</Text><Text style={s.help}>Authenticate before opening field operations.</Text></View>;
+ const active=missions.find(m=>['assigned','active','in_progress'].includes(m.status))||missions[0];
+ return <SafeAreaView style={s.safe}><ScrollView contentContainerStyle={s.body}>
+  <View style={s.top}><View><Text style={s.eyebrow}>MARKET MAPPER</Text><Text style={s.greeting}>Hello, {user.fullName.split(' ')[0]}</Text><Text style={s.role}>{user.role.replace('_',' ')}</Text></View><Pressable style={s.bell} onPress={()=>router.push('/notifications')}><Text style={s.bellText}>Bell</Text>{unread?<View style={s.badge}><Text style={s.badgeText}>{unread>99?'99+':unread}</Text></View>:null}</Pressable></View>
+  {active?<View style={s.hero}><Text style={s.heroEyebrow}>ACTIVE MISSION</Text><Text style={s.heroTitle}>{active.title}</Text><Text style={s.heroMeta}>{active.marketName||'Assigned market'} · {active.status.replace('_',' ')}</Text><Pressable style={s.primary} onPress={()=>router.push({pathname:'/map',params:{missionId:active.id}})}><Text style={s.primaryText}>Continue Mapping</Text></Pressable></View>:<View style={s.empty}><Text style={s.emptyTitle}>No Active Mission</Text><Text style={s.help}>You can still view Missions, Chat, Revisits and Offline Data.</Text></View>}
+  <Text style={s.section}>FIELD WORK</Text><View style={s.grid}><Tile title="Missions" sub={missions.length+' assigned'} onPress={()=>router.push('/missions')}/><Tile title="Map" sub="Field workspace" onPress={()=>active?router.push({pathname:'/map',params:{missionId:active.id}}):router.push('/missions')}/><Tile title="Chat" sub="Mission teams" onPress={()=>router.push('/chat')}/><Tile title="Offline Data" sub={sync?.state==='synced'?'Synced':(sync?.relationalPending||0)+(sync?.mediaPending||0)+' pending'} onPress={()=>router.push('/offline-data')}/></View>
+  {user.role!=='mapper'?<><Text style={s.section}>{user.role==='admin'?'OPERATIONS':'TEAM COORDINATION'}</Text><View style={s.grid}><Tile title={user.role==='admin'?'Admin Workspace':'Assignments'} sub={user.role==='admin'?'Users · teams · catalogue':'Team field work'} onPress={()=>router.push('/more')}/><Tile title="Field Issues" sub="Review operational issues" onPress={()=>router.push('/more')}/></View></>:null}
+ </ScrollView></SafeAreaView>
 }
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F7FAF8' },
-  container: { flex: 1, justifyContent: 'center', paddingHorizontal: 24, gap: 14 },
-  eyebrow: { color: '#047857', fontSize: 13, fontWeight: '800', letterSpacing: 1.5 },
-  title: { color: '#111827', fontSize: 32, lineHeight: 38, fontWeight: '800' },
-  body: { color: '#374151', fontSize: 16, lineHeight: 24, maxWidth: 640 },
-  card: { marginTop: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 16, padding: 18 },
-  cardTitle: { color: '#065F46', fontSize: 17, fontWeight: '800', marginBottom: 6 },
-  cardText: { color: '#374151', fontSize: 15, lineHeight: 22 }
-});
+function Tile({title,sub,onPress}:{title:string;sub:string;onPress:()=>void}){return <Pressable style={s.tile} onPress={onPress}><Text style={s.tileTitle}>{title}</Text><Text style={s.help}>{sub}</Text></Pressable>}
+const s=StyleSheet.create({safe:{flex:1,backgroundColor:'#F7FAF8'},body:{padding:18,gap:14,paddingBottom:42},center:{flex:1,alignItems:'center',justifyContent:'center',padding:24,backgroundColor:'#F7FAF8'},top:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},eyebrow:{fontSize:12,fontWeight:'900',letterSpacing:1.4,color:'#047857'},greeting:{fontSize:28,fontWeight:'900',color:'#111827',marginTop:3},role:{fontSize:12,fontWeight:'800',color:'#6B7280',textTransform:'uppercase',marginTop:3},bell:{minWidth:52,height:52,borderRadius:14,borderWidth:2,borderColor:'#9CA3AF',backgroundColor:'#FFF',alignItems:'center',justifyContent:'center'},bellText:{fontSize:11,fontWeight:'900',color:'#111827'},badge:{position:'absolute',right:-6,top:-7,minWidth:24,height:24,borderRadius:12,paddingHorizontal:5,backgroundColor:'#B91C1C',alignItems:'center',justifyContent:'center'},badgeText:{color:'#FFF',fontSize:10,fontWeight:'900'},hero:{padding:18,borderRadius:16,borderWidth:2,borderColor:'#047857',backgroundColor:'#ECFDF5'},heroEyebrow:{fontSize:11,fontWeight:'900',letterSpacing:1.1,color:'#047857'},heroTitle:{fontSize:22,fontWeight:'900',color:'#111827',marginTop:6},heroMeta:{fontSize:13,color:'#4B5563',marginTop:4},primary:{minHeight:52,marginTop:16,borderRadius:12,backgroundColor:'#047857',alignItems:'center',justifyContent:'center'},primaryText:{color:'#FFF',fontWeight:'900',fontSize:15},empty:{padding:18,borderRadius:16,borderWidth:2,borderColor:'#D1D5DB',backgroundColor:'#FFF'},emptyTitle:{fontSize:20,fontWeight:'900',color:'#111827'},section:{fontSize:12,fontWeight:'900',letterSpacing:1.2,color:'#374151',marginTop:4},grid:{flexDirection:'row',flexWrap:'wrap',gap:10},tile:{minHeight:92,minWidth:'47%',flexGrow:1,padding:14,borderRadius:14,borderWidth:2,borderColor:'#D1D5DB',backgroundColor:'#FFF',justifyContent:'center'},tileTitle:{fontSize:16,fontWeight:'900',color:'#111827'},help:{fontSize:13,lineHeight:19,color:'#4B5563',marginTop:4},title:{fontSize:22,fontWeight:'900',color:'#111827'}});
