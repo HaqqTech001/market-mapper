@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { initializeNativeDatabase } from '@/src/native/database';
 import { OperationalRealtimeLifecycle } from '@/src/native/OperationalRealtimeLifecycle';
+import { FieldBottomNav } from '@/src/native/FieldBottomNav';
+
+const CORE=['/','/map','/missions','/chat','/more'];
 
 export default function RootLayout() {
+  const pathname = usePathname();
   const [state, setState] = useState<'booting' | 'ready' | 'error'>('booting');
 
   useEffect(() => {
@@ -41,7 +45,8 @@ export default function RootLayout() {
     <>
       <OperationalRealtimeLifecycle />
       <StatusBar style="dark" />
-      <Stack screenOptions={{ headerShown: false }} />
+      <View style={{flex:1}}><Stack screenOptions={{ headerShown: false }} /></View>
+      {CORE.includes(pathname) ? <FieldBottomNav /> : null}
     </>
   );
 }
