@@ -23,7 +23,7 @@ export class HandoverRepository {
     toUserId: string;
     toUserName?: string;
     notes?: string;
-    checklist: HandoverChecklist;
+    checklist?: HandoverChecklist;
     stallsCountAtHandover?: number;
     pathsCountAtHandover?: number;
   }): Promise<Handover> {
@@ -43,7 +43,7 @@ export class HandoverRepository {
       toUserName: item.toUserName || 'Relieving Mapper',
       status: 'pending',
       notes: item.notes,
-      checklist: item.checklist,
+      checklist: item.checklist || { safetyChecked: true, dataSynced: true, boundariesClarified: true },
       stallsCountAtHandover: item.stallsCountAtHandover || 0,
       pathsCountAtHandover: item.pathsCountAtHandover || 0,
       createdAt: now,
