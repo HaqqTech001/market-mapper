@@ -15,8 +15,8 @@ const activities: BusinessActivity[] = ['sells_goods','provides_services','both'
 const junctionTypes: { value: JunctionType; label: string; glyph: string }[] = [
   { value:'t_junction', label:'T-Junction', glyph:'┬' }, { value:'cross_4way', label:'Cross / 4-Way', glyph:'┼' },
   { value:'y_fork', label:'Y / Fork', glyph:'Y' }, { value:'irregular_3way', label:'Irregular 3-Way', glyph:'⋔' },
-  { value:'multi_way_complex', label:'Multi-Way / Complex', glyph:'✣' }, { value:'corner_bend', label:'Corner / Bend', glyph:'⌞' },
-  { value:'path_end_dead_end', label:'Path End / Dead End', glyph:'⊣' }, { value:'other_unknown', label:'Other / Unknown', glyph:'?' },
+  { value:'multi_way', label:'Multi-Way / Complex', glyph:'✣' }, { value:'corner_bend', label:'Corner / Bend', glyph:'⌞' },
+  { value:'dead_end', label:'Path End / Dead End', glyph:'⊣' }, { value:'unknown', label:'Other / Unknown', glyph:'?' },
 ];
 
 export function NativeBusinessCapture({ visible, onClose, onSave }: { visible: boolean; onClose: () => void; onSave: (value: BusinessCaptureValue) => Promise<void> }) {
