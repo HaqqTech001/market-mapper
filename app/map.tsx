@@ -11,6 +11,7 @@ import { NativeBusinessCapture, NativeIssueCapture, NativeJunctionPicker, Native
 import { RemainingBranchesSheet } from '@/src/native/RemainingBranchesSheet';
 import { persistBusinessPhoto } from '@/src/native/businessMedia';
 import { PathRepository } from '@/src/db/repositories/PathRepository';
+import { getNativeSyncSnapshot, retryNativeSync, runNativeSync, type NativeSyncSnapshot } from '@/src/native/syncCoordinator';
 
 const recorder = new NativePathRecorder();
 
@@ -24,6 +25,8 @@ export default function MapScreen() {
   const [contextError, setContextError] = useState<string | null>(null);
   const [capture, setCapture] = useState<'business' | 'junction' | 'place' | 'issue' | null>(null);
   const [showBranches, setShowBranches] = useState(false);
+  const [sync, setSync] = useState<NativeSyncSnapshot>({ state: 'saved', relationalPending: 0, mediaPending: 0 });
+  const [syncBusy, setSyncBusy] = useState(false);
   const [branchTarget, setBranchTarget] = useState<{ branchId: string; label: string; latitude: number; longitude: number } | null>(null);
   const subscription = useRef<LocationSubscription | null>(null);
 
@@ -74,6 +77,7 @@ export default function MapScreen() {
         console.error('Path recovery failed', error);
       }
 
+      setSync(await getNativeSyncSnapshot());
       await ensureLocation();
     })();
     return () => subscription.current?.remove();
@@ -98,6 +102,9 @@ export default function MapScreen() {
         <Text style={styles.reviewTitle}>Check this path before saving</Text>
         <View style={styles.reviewMap}><NativeFieldMap currentLocation={current} path={path} /></View>
         {branchTarget ? <Text style={styles.branchTarget}>Return to {branchTarget.label} to map the selected branch.</Text> : null}
+        <Pressable disabled={syncBusy} onPress={async()=>{setSyncBusy(true);try{setSync({...sync,state:'syncing'});setSync(await (sync.state==='failed'?retryNativeSync():runNativeSync()));}finally{setSyncBusy(false)}}} style={[styles.syncBadge,sync.state==='failed'&&styles.syncFailed]}>
+          <Text style={[styles.syncText,sync.state==='failed'&&styles.syncFailedText]}>{syncLabel(sync)}{sync.relationalPending+sync.mediaPending>0?` · ${sync.relationalPending+sync.mediaPending}`:''}</Text>
+        </Pressable>
         <View style={styles.metrics}>
           <Metric label="Distance" value={formatDistance(snapshot.distanceMeters)} />
           <Metric label="Total time" value={formatTime(snapshot.durationSeconds)} />
@@ -115,6 +122,7 @@ export default function MapScreen() {
               setBranchTarget(null);
             }
             setSnapshot(recorder.getSnapshot());
+            setSync(await getNativeSyncSnapshot());
           } catch (error) {
             Alert.alert('Could not save path', error instanceof Error ? error.message : 'Please try again.');
           } finally { setBusy(false); }
@@ -170,6 +178,7 @@ export default function MapScreen() {
         const savedBusiness = await saveQuickBusiness({ missionId: snapshot.missionId, userId: userContext.userId, pathSessionId: snapshot.sessionId, latitude: current.latitude, longitude: current.longitude }, { ...value, photoDeclined: value.photoDeclined, localPhotoUri: value.photo?.localUri });
         if (value.photo) await persistBusinessPhoto(userContext.userId, savedBusiness.id, value.photo);
         if (recorder.getSnapshot().status !== before) throw new Error('Business capture changed path state.');
+        setSync(await getNativeSyncSnapshot());
         setCapture(null);
         Alert.alert('Business saved', 'Business and offerings saved locally. Path recording state was preserved.');
       }} />
@@ -178,6 +187,7 @@ export default function MapScreen() {
         const before = recorder.getSnapshot().status;
         await savePlaceDuringPath({ missionId: snapshot.missionId, userId: userContext.userId, marketId: mission?.marketId, pathSessionId: snapshot.sessionId, latitude: current.latitude, longitude: current.longitude }, value);
         if (recorder.getSnapshot().status !== before) throw new Error('Place capture changed path state.');
+        setSync(await getNativeSyncSnapshot());
         setCapture(null); Alert.alert('Place saved', 'Place saved locally without changing path state.');
       }} />
       <NativeIssueCapture visible={capture === 'issue'} onClose={() => setCapture(null)} onSave={async (value) => {
@@ -185,6 +195,7 @@ export default function MapScreen() {
         const before = recorder.getSnapshot().status;
         await saveQuickIssue({ missionId: snapshot.missionId, userId: userContext.userId, pathSessionId: snapshot.sessionId, latitude: current.latitude, longitude: current.longitude }, value);
         if (recorder.getSnapshot().status !== before) throw new Error('Issue capture changed path state.');
+        setSync(await getNativeSyncSnapshot());
         setCapture(null); Alert.alert('Issue reported', 'Issue saved locally without changing path state.');
       }} />
       <NativeJunctionPicker visible={capture === 'junction'} onClose={() => setCapture(null)} onSave={async (junctionType) => {
@@ -192,6 +203,7 @@ export default function MapScreen() {
         const before = recorder.getSnapshot().status;
         await saveQuickJunction({ missionId: snapshot.missionId, userId: userContext.userId, pathSessionId: snapshot.sessionId, latitude: current.latitude, longitude: current.longitude }, { junctionType });
         if (recorder.getSnapshot().status !== before) throw new Error('Junction capture changed path state.');
+        setSync(await getNativeSyncSnapshot());
         Alert.alert('Junction saved', 'Junction saved without stopping the path.');
       }} />
     </View>
@@ -222,6 +234,9 @@ const styles = StyleSheet.create({
   captureActions: { position: 'absolute', left: 16, right: 16, bottom: 88, flexDirection: 'row', gap: 8 },
   captureButton: { minHeight: 48, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#065F46', paddingHorizontal: 8 },
   captureText: { color: '#065F46', fontSize: 13, fontWeight: '900' },
+  syncBadge:{alignSelf:'flex-start',minHeight:36,justifyContent:'center',paddingHorizontal:10,borderRadius:9,borderWidth:2,borderColor:'#047857',backgroundColor:'#ECFDF5',marginTop:8},
+  syncFailed:{borderColor:'#B91C1C',backgroundColor:'#FEF2F2'},
+  syncText:{fontSize:11,fontWeight:'900',color:'#065F46'},syncFailedText:{color:'#991B1B'},
   branchTarget: { marginTop: 8, padding: 8, borderRadius: 8, backgroundColor: '#FFFBEB', color: '#92400E', fontSize: 13, fontWeight: '800' },
   branchesButton: { position: 'absolute', left: 16, right: 16, bottom: 88, minHeight: 50, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#047857' },
   branchesText: { color: '#047857', fontSize: 15, fontWeight: '900' },
