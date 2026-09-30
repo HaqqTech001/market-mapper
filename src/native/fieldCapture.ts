@@ -46,7 +46,7 @@ export async function saveQuickBusiness(
     headingSource: context.heading == null ? 'none' : 'compass',
     directionConfidence: context.heading == null ? 'none' : 'medium',
     parentPathSessionId: context.pathSessionId ?? undefined,
-    shopNumber: input.shopNumber,
+    stallNumber: input.shopNumber,
     sectionName: input.sectionName,
     lineName: input.lineName,
     primaryCategoryId: input.primaryCategoryId,
@@ -84,7 +84,7 @@ export async function saveQuickJunction(
   if (!active.session || active.session.sessionId !== context.pathSessionId) throw new Error('Active path session could not be verified.');
   const id = `junc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const label = `Junction J${String(active.junctions.length + 1).padStart(3, '0')}`;
-  const junction = {
+  const junction: import('@/src/types').LocalPathJunction = {
     id,
     sessionId: context.pathSessionId,
     operationalLabel: label,
