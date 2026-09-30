@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
 import type { LatLng } from 'react-native-maps';
 import type { LocationSubscription } from '@/src/lib/location/locationService';
 import { NativeFieldMap } from '@/src/native/NativeFieldMap';
@@ -102,9 +103,9 @@ export default function MapScreen() {
         <Text style={styles.reviewTitle}>Check this path before saving</Text>
         <View style={styles.reviewMap}><NativeFieldMap currentLocation={current} path={path} /></View>
         {branchTarget ? <Text style={styles.branchTarget}>Return to {branchTarget.label} to map the selected branch.</Text> : null}
-        <Pressable disabled={syncBusy} onPress={async()=>{setSyncBusy(true);try{setSync({...sync,state:'syncing'});setSync(await (sync.state==='failed'?retryNativeSync():runNativeSync()));}finally{setSyncBusy(false)}}} style={[styles.syncBadge,sync.state==='failed'&&styles.syncFailed]}>
+        <View style={styles.syncRow}><Pressable disabled={syncBusy} onPress={async()=>{setSyncBusy(true);try{setSync({...sync,state:'syncing'});setSync(await (sync.state==='failed'?retryNativeSync():runNativeSync()));}finally{setSyncBusy(false)}}} style={[styles.syncBadge,sync.state==='failed'&&styles.syncFailed]}>
           <Text style={[styles.syncText,sync.state==='failed'&&styles.syncFailedText]}>{syncLabel(sync)}{sync.relationalPending+sync.mediaPending>0?` · ${sync.relationalPending+sync.mediaPending}`:''}</Text>
-        </Pressable>
+        </Pressable><Pressable onPress={()=>router.push('/offline-data')} style={styles.offlineLink}><Text style={styles.offlineLinkText}>Offline Data</Text></Pressable></View>
         <View style={styles.metrics}>
           <Metric label="Distance" value={formatDistance(snapshot.distanceMeters)} />
           <Metric label="Total time" value={formatTime(snapshot.durationSeconds)} />
@@ -234,6 +235,8 @@ const styles = StyleSheet.create({
   captureActions: { position: 'absolute', left: 16, right: 16, bottom: 88, flexDirection: 'row', gap: 8 },
   captureButton: { minHeight: 48, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#065F46', paddingHorizontal: 8 },
   captureText: { color: '#065F46', fontSize: 13, fontWeight: '900' },
+  syncRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},
+  offlineLink:{minHeight:36,justifyContent:'center',paddingHorizontal:8},offlineLinkText:{fontSize:12,fontWeight:'900',color:'#374151',textDecorationLine:'underline'},
   syncBadge:{alignSelf:'flex-start',minHeight:36,justifyContent:'center',paddingHorizontal:10,borderRadius:9,borderWidth:2,borderColor:'#047857',backgroundColor:'#ECFDF5',marginTop:8},
   syncFailed:{borderColor:'#B91C1C',backgroundColor:'#FEF2F2'},
   syncText:{fontSize:11,fontWeight:'900',color:'#065F46'},syncFailedText:{color:'#991B1B'},
