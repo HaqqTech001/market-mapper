@@ -7,7 +7,7 @@ import { getDatabase } from '../sqlite';
 import { Revisit, RevisitReason, RevisitEntityType } from '../../types';
 
 export class RevisitRepository {
-  private static db = getDatabase();
+  private static get db() { return getDatabase(); }
 
   static async flag(revisit: Omit<Revisit, 'id' | 'createdAt' | 'updatedAt' | 'syncStatus' | 'status'>): Promise<Revisit> {
     const id = `rev_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
