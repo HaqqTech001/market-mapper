@@ -17,7 +17,7 @@ import { OutboxRepository } from './OutboxRepository';
 import { NotificationRepository } from './NotificationRepository';
 
 export class FieldIssueRepository {
-  private static db = getDatabase();
+  private static get db() { return getDatabase(); }
 
   static async reportIssue(item: {
     id?: string;
