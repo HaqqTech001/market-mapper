@@ -1,52 +1,49 @@
-# Native migration
+# Native productionization status
 
-This branch is the controlled migration from the original Vite/React prototype to the production-target React Native + Expo application.
+This branch is the controlled migration from the original Vite/React prototype to the production-target React Native + Expo application. `master` remains protected/reference until native parity and validation.
 
-## Rules
+## Implemented in code
 
-- `master` remains the reference implementation until native parity is reached.
-- Expo/React Native is authoritative on this branch.
-- Existing domain logic under `src/` is preserved and ported deliberately.
-- Do not claim a capability is native until its dependency, adapter, UI, and validation exist.
-- Web-only files remain temporarily as migration reference and are excluded from the native TypeScript entry path where necessary.
+- Expo Router / React Native application foundation.
+- Expo SQLite is the authoritative native local database; reference catalogue seed only on the native migration path.
+- Supabase session persistence via SecureStore and authenticated profile/role resolution.
+- Mapping is restricted to missions assigned through `mission_members`; no temporary mission/current-user fallback.
+- react-native-maps + Expo Location foreground GPS.
+- Durable path recorder: raw samples, movement filtering, stationary state, Pause/Resume, multi-segment recording, Finish -> Review -> Save, review crash recovery, explicit Discard.
+- Capture during active/paused path without changing path state:
+  - four-step Business flow with catalogue offerings and optional photo/Photo Declined;
+  - eight-type Junction picker;
+  - Place capture;
+  - Field Issue capture.
+- Junction branch persistence and Remaining Branches workflow; selected branch progresses UNMAPPED -> IN_PROGRESS -> MAPPED when its new path is actually finalized.
+- Native business photos: camera/gallery selection, resize/compression, durable local staging and independent upload queue.
+- Real outbox synchronization code for Businesses/Offerings, Paths, Junctions/Branches, Places and Field Issues.
+- Separate Supabase Storage media worker; relational records do not depend on photo upload success.
+- Sync HUD and Offline Data / Sync Centre with pending/failed counts, bounded retry and preserved suspected conflicts.
+- Supabase/PostGIS migrations for operational paths, junction graph, places, businesses, offerings, issues and private field-media storage with RLS/storage policies.
 
-## Stage 1 checkpoint
+## Deliberately not claimed as verified
 
-Implemented:
-- Expo application entry via `expo-router/entry`
-- React Native runtime dependencies
-- Expo Router root layout
-- native foundation screen
-- Expo TypeScript base configuration
-- Android/iOS package identifiers
+These changes have been committed through the GitHub integration; they have NOT yet been installed and exercised on a physical Android device in this workflow.
 
-Not yet implemented:
-- Expo SQLite adapter
-- native map/location
-- native authentication/session persistence
-- camera/media
-- notifications
-- operational Supabase schema/sync
-- native ports of mapping workflows
+Before production release, still required:
+1. Install dependencies and regenerate/verify the package lock.
+2. Run TypeScript/typecheck and resolve any Expo 57 API/version mismatches.
+3. Run `npx expo prebuild` and `npx expo run:android` locally.
+4. Apply Supabase migrations to a non-production/staging project first and validate RLS with mapper/team-lead/admin accounts.
+5. Validate GPS drift/movement, Pause/Resume, crash recovery and branch continuation physically.
+6. Validate camera/gallery permissions, durable staged files, offline capture and later Storage upload.
+7. Exercise airplane-mode capture -> reconnect -> sync, server/RLS failures, retry and conflict preservation.
+8. Validate tablet/iPad layouts and outdoor readability on hardware.
+9. Complete/validate cloud coverage for remaining coordination domains (revisits, handovers, reconciliation, chat, notifications/catalogue administration) before those are considered production-native.
+10. Add native Review correction controls (undo distance/time, trim, restart from selected point/junction); the current native Review supports save/discard and recovery but not the full correction toolset.
+11. Background GPS is NOT enabled; only foreground location is currently requested/implemented.
 
-Those are subsequent controlled stages.
+## Production safety rules
 
-
-## Native path recorder checkpoint
-
-Implemented on the migration branch:
-- Expo Location foreground GPS stream
-- react-native-maps authoritative field renderer
-- existing movement detector reused for stationary drift / movement acceptance
-- every raw GPS sample persisted to Expo SQLite while recording
-- multi-segment Pause / Resume
-- unfinished session recovery
-- Finish -> Review separation
-- Save -> finalized local path + existing outbox queue
-- explicit confirmed Discard
-
-Integration blockers before production use:
-- replace temporary native field mission ID with authenticated selected mission context
-- replace temporary save owner with authenticated profile ID
-- wire correction controls (undo distance/time, trim, restart from junction) into native Review UI
-- physical Android GPS/recovery validation remains required
+- Never expose the Supabase service-role key in the mobile app.
+- Never clear SQLite merely because a user signs out; unsynced field work may exist.
+- Never display Synced unless both relational and media queues confirm completion.
+- Never auto-resolve a suspected concurrent cloud/local conflict by overwriting another mapper's data.
+- Never enable automatic operational demo mission seeding or implicit demo login in production.
+- Browser/Vite code remains migration reference only; it is not evidence that a capability works natively.
