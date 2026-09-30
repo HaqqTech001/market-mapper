@@ -2,8 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { NotificationRepository } from '@/src/db/repositories/NotificationRepository';
-import { getAssignedNativeMissions, requireNativeUserContext, type NativeUserContext } from '@/src/native/userContext';
-import { startOperationalRealtime } from '@/src/native/operationalRealtime';
+import { requireNativeUserContext, type NativeUserContext } from '@/src/native/userContext';
 import { runNativeSync } from '@/src/native/syncCoordinator';
 import type { NotificationItem } from '@/src/types';
 
@@ -11,7 +10,7 @@ export default function NotificationsScreen(){
  const [user,setUser]=useState<NativeUserContext|null>(null); const [items,setItems]=useState<NotificationItem[]>([]); const [loading,setLoading]=useState(true);
  const load=useCallback(async()=>{if(user)setItems(await NotificationRepository.getNotificationsForUser(user.userId))},[user]);
  useFocusEffect(useCallback(()=>{load()},[load]));
- useEffect(()=>{let cleanup:(()=>void)|undefined;let mounted=true;(async()=>{try{const u=await requireNativeUserContext();if(!mounted)return;setUser(u);setItems(await NotificationRepository.getNotificationsForUser(u.userId));const missions=await getAssignedNativeMissions(u.userId);cleanup=await startOperationalRealtime(u.userId,missions.map(m=>m.id),async()=>setItems(await NotificationRepository.getNotificationsForUser(u.userId)))}finally{if(mounted)setLoading(false)}})();return()=>{mounted=false;cleanup?.()}},[]);
+ useEffect(()=>{let mounted=true;(async()=>{try{const u=await requireNativeUserContext();if(!mounted)return;setUser(u);setItems(await NotificationRepository.getNotificationsForUser(u.userId))}finally{if(mounted)setLoading(false)}})();return()=>{mounted=false}},[]);
  const open=async(n:NotificationItem)=>{if(!n.isRead){await NotificationRepository.markAsRead(n.id);await load();runNativeSync().catch(()=>{})}const t=n.entityReferenceType;if(t==='mission')router.push('/missions');else if(['business','path','junction','place','field_issue'].includes(String(t)))router.push('/map')};
  const markAll=async()=>{if(!user)return;await NotificationRepository.markAllAsRead(user.userId);await load();runNativeSync().catch(()=>{})};
  if(loading)return <View style={s.center}><ActivityIndicator/><Text style={s.help}>Loading notifications…</Text></View>;
