@@ -35,7 +35,9 @@ async function apply(item:OutboxQueueItem){
  const config:Record<string,{table:string,map:(p:Payload)=>Payload}>={market_paths:{table:'market_paths',map:mapPath},path_junctions:{table:'path_junctions',map:mapJunction},junction_branches:{table:'junction_branches',map:mapBranch},local_field_issues:{table:'field_issues',map:mapIssue},local_market_places:{table:'market_places',map:mapPlace},local_revisits:{table:'revisits',map:mapRevisit},local_handovers:{table:'handovers',map:mapHandover},local_area_reconciliations:{table:'area_reconciliations',map:mapReconciliation},local_chat_channels:{table:'chat_channels',map:mapChatChannel},local_chat_messages:{table:'chat_messages',map:mapChatMessage},local_notifications:{table:'notifications',map:mapNotification}};
  const target=config[item.tableName]; if(!target)throw new Error(`SYNC_UNSUPPORTED_TABLE:${item.tableName}`);
  let mapped:Payload;
- if(item.tableName==='local_chat_messages' && item.action==='UPDATE'){
+ if(item.tableName==='local_notifications' && item.action==='UPDATE'){
+   mapped={is_read:!!p.isRead};
+ } else if(item.tableName==='local_chat_messages' && item.action==='UPDATE'){
    mapped={};
    if(p.isPinned!==undefined)mapped.is_pinned=!!p.isPinned;
  } else if(item.tableName==='junction_branches' && item.action==='UPDATE'){
