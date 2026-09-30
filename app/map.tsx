@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { LatLng } from 'react-native-maps';
 import type { LocationSubscription } from '@/src/lib/location/locationService';
 import { NativeFieldMap } from '@/src/native/NativeFieldMap';
 import { nativeLocationService } from '@/src/native/locationService';
 import { NativePathRecorder } from '@/src/native/NativePathRecorder';
+import { saveQuickBusiness, saveQuickIssue, saveQuickJunction } from '@/src/native/fieldCapture';
 
 const recorder = new NativePathRecorder();
 const TEMP_MISSION_ID = 'native-field-session'; // replaced by selected mission in mission-flow port
@@ -14,6 +15,8 @@ export default function MapScreen() {
   const [current, setCurrent] = useState<LatLng | null>(null);
   const [snapshot, setSnapshot] = useState(recorder.getSnapshot());
   const [busy, setBusy] = useState(false);
+  const [capture, setCapture] = useState<'business' | 'junction' | 'issue' | null>(null);
+  const [captureText, setCaptureText] = useState('');
   const subscription = useRef<LocationSubscription | null>(null);
 
   const path = snapshot.acceptedPoints.map((p) => ({ latitude: p.latitude, longitude: p.longitude }));
@@ -109,6 +112,11 @@ export default function MapScreen() {
           <Metric label="Time" value={formatTime(snapshot.durationSeconds)} />
         </View>
       </View>
+      {snapshot.status === 'recording' || snapshot.status === 'paused' ? <View style={styles.captureActions}>
+        <Pressable style={styles.captureButton} onPress={() => setCapture('business')}><Text style={styles.captureText}>+ Business</Text></Pressable>
+        <Pressable style={styles.captureButton} onPress={() => setCapture('junction')}><Text style={styles.captureText}>+ Junction</Text></Pressable>
+        <Pressable style={styles.captureButton} onPress={() => setCapture('issue')}><Text style={styles.captureText}>Report Issue</Text></Pressable>
+      </View> : null}
       <View style={styles.actions}>
         {snapshot.status === 'idle' ? (
           <Pressable disabled={busy} style={styles.primary} onPress={() => run(() => recorder.start(TEMP_MISSION_ID))}><Text style={styles.primaryText}>Start Path</Text></Pressable>
@@ -124,6 +132,29 @@ export default function MapScreen() {
           </>
         )}
       </View>
+      <Modal visible={capture !== null} transparent animationType="slide" onRequestClose={() => setCapture(null)}>
+        <View style={styles.modalBackdrop}><View style={styles.sheet}>
+          <Text style={styles.sheetTitle}>{capture === 'business' ? 'Quick Business' : capture === 'junction' ? 'Add Junction' : 'Report Field Issue'}</Text>
+          <Text style={styles.reviewNote}>Path recording state will not be changed by this capture.</Text>
+          <TextInput value={captureText} onChangeText={setCaptureText} placeholder={capture === 'business' ? 'Business name (optional)' : capture === 'junction' ? 'Local reference (optional)' : 'What happened?'} style={styles.input} placeholderTextColor="#6B7280" />
+          <View style={styles.sheetActions}>
+            <Pressable style={styles.secondary} onPress={() => { setCapture(null); setCaptureText(''); }}><Text style={styles.secondaryText}>Cancel</Text></Pressable>
+            <Pressable style={styles.primary} onPress={async () => {
+              if (!current || !capture || !snapshot.missionId) return;
+              setBusy(true);
+              try {
+                const context = { missionId: snapshot.missionId, userId: 'current-user', pathSessionId: snapshot.sessionId, latitude: current.latitude, longitude: current.longitude };
+                if (capture === 'business') await saveQuickBusiness(context, { name: captureText, businessType: 'shop', activity: 'sells_goods' });
+                if (capture === 'junction') await saveQuickJunction(context, { junctionType: 'unknown', displayName: captureText || undefined });
+                if (capture === 'issue') await saveQuickIssue(context, { issueType: 'other', title: 'Field issue', description: captureText || 'Field issue reported during mapping.' });
+                setCapture(null); setCaptureText('');
+                setSnapshot(recorder.getSnapshot());
+              } catch (error) { Alert.alert('Could not save capture', error instanceof Error ? error.message : 'Please try again.'); }
+              finally { setBusy(false); }
+            }}><Text style={styles.primaryText}>{busy ? 'Saving…' : 'Save'}</Text></Pressable>
+          </View>
+        </View></View>
+      </Modal>
     </View>
   );
 }
@@ -148,6 +179,9 @@ const styles = StyleSheet.create({
   metric: { minWidth: 92, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 10, backgroundColor: '#F3F4F6' },
   metricValue: { fontSize: 18, fontWeight: '900', color: '#111827' },
   metricLabel: { marginTop: 2, fontSize: 12, fontWeight: '700', color: '#4B5563' },
+  captureActions: { position: 'absolute', left: 16, right: 16, bottom: 88, flexDirection: 'row', gap: 8 },
+  captureButton: { minHeight: 48, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#065F46', paddingHorizontal: 8 },
+  captureText: { color: '#065F46', fontSize: 13, fontWeight: '900' },
   actions: { position: 'absolute', left: 16, right: 16, bottom: 20, flexDirection: 'row', gap: 12 },
   primary: { minHeight: 52, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: '#047857', paddingHorizontal: 18 },
   primaryText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
@@ -160,4 +194,9 @@ const styles = StyleSheet.create({
   reviewNote: { fontSize: 14, lineHeight: 21, color: '#4B5563' },
   danger: { minHeight: 50, alignItems: 'center', justifyContent: 'center', borderRadius: 14, borderWidth: 2, borderColor: '#B91C1C' },
   dangerText: { color: '#991B1B', fontSize: 15, fontWeight: '900' },
+  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(17,24,39,0.35)' },
+  sheet: { backgroundColor: '#F9FAFB', padding: 20, borderTopLeftRadius: 22, borderTopRightRadius: 22, borderWidth: 1, borderColor: '#D1D5DB', gap: 12 },
+  sheetTitle: { fontSize: 22, fontWeight: '900', color: '#111827' },
+  input: { minHeight: 52, borderWidth: 2, borderColor: '#9CA3AF', borderRadius: 12, paddingHorizontal: 14, color: '#111827', backgroundColor: '#FFFFFF', fontSize: 16 },
+  sheetActions: { flexDirection: 'row', gap: 12 },
 });
