@@ -12,6 +12,8 @@ function mapBusiness(p: Payload) {
 }
 function mapIssue(p:Payload){return {id:p.id,mission_id:p.missionId,area_id:p.areaId||null,reported_by:p.reportedBy,reported_by_role:p.reportedByRole||'mapper',issue_type:p.issueType,severity:p.severity||'medium',title:p.title,description:p.description,location:point(p.latitude,p.longitude),location_label:p.locationLabel||null,photo_path:p.photoUri||null,status:p.status||'open',resolved_by:p.resolvedBy||null,resolution_notes:p.resolutionNotes||null,resolved_at:p.resolvedAt||null,created_at:p.createdAt,updated_at:p.updatedAt};}
 function mapPath(p:Payload){return {id:p.id,mission_id:p.missionId,session_id:p.sessionId||null,name:p.name,distance_meters:p.distanceMeters||0,duration_seconds:p.durationSeconds||0,geometry:line(p.rawPoints||[]),raw_points:p.rawPoints||[],is_verified:!!p.isVerified,version:p.version||1,created_by:p.createdBy,updated_by:p.updatedBy||p.createdBy,client_created_at:p.clientCreatedAt||null,created_at:p.createdAt,updated_at:p.updatedAt};}
+function mapJunction(p:Payload){return {id:p.id,mission_id:p.missionId||null,path_id:p.pathId||null,session_id:p.sessionId||null,operational_label:p.operationalLabel,display_name:p.displayName||null,junction_type:p.junctionType||'unknown',location:point(p.latitude,p.longitude),verification_state:p.verificationState||'unverified',created_by:p.createdBy||null,created_at:p.createdAt};}
+function mapBranch(p:Payload){return {id:p.id,junction_id:p.junctionId,label:p.label,relative_side:p.relativeSide||null,status:p.status||'unmapped',connected_path_id:p.connectedPathId||null,connected_target_junction_id:p.connectedTargetJunctionId||null,notes:p.notes||null,mapped_at:p.mappedAt||null,mapped_by:p.mappedBy||null,created_at:p.createdAt};}
 function mapPlace(p:Payload){return {id:p.id,market_id:p.marketId,mission_id:p.missionId||null,area_id:p.areaId||null,operational_label:p.operationalLabel,display_name:p.displayName||null,place_type:p.placeType,location:point(p.latitude,p.longitude),description:p.description||null,created_by:p.createdBy||null,created_at:p.createdAt,updated_at:p.updatedAt};}
 
 async function apply(item:OutboxQueueItem){
@@ -22,10 +24,18 @@ async function apply(item:OutboxQueueItem){
    if(offerings.length){const rows=offerings.map((o:any)=>({id:o.id,business_id:p.id,catalogue_item_id:o.catalogueItemId||null,pending_suggestion_id:o.pendingSuggestionId||null,item_type:o.itemType||'product',item_name:o.catalogueItemName||null,how_established:o.howEstablished||'observed',created_at:o.createdAt}));const {error:e}=await nativeSupabase.from('business_offerings').upsert(rows,{onConflict:'id'});if(e)throw e;}
    return;
  }
- const config:Record<string,{table:string,map:(p:Payload)=>Payload}>={market_paths:{table:'market_paths',map:mapPath},local_field_issues:{table:'field_issues',map:mapIssue},local_market_places:{table:'market_places',map:mapPlace}};
+ const config:Record<string,{table:string,map:(p:Payload)=>Payload}>={market_paths:{table:'market_paths',map:mapPath},path_junctions:{table:'path_junctions',map:mapJunction},junction_branches:{table:'junction_branches',map:mapBranch},local_field_issues:{table:'field_issues',map:mapIssue},local_market_places:{table:'market_places',map:mapPlace}};
  const target=config[item.tableName]; if(!target)throw new Error(`SYNC_UNSUPPORTED_TABLE:${item.tableName}`);
- const mapped=target.map(p);
- const query=item.action==='DELETE'?nativeSupabase.from(target.table).delete().eq('id',item.recordId):nativeSupabase.from(target.table).upsert(mapped,{onConflict:'id'});
+ let mapped:Payload;
+ if(item.tableName==='junction_branches' && item.action==='UPDATE'){
+   mapped={};
+   if(p.status!==undefined)mapped.status=p.status;
+   if(p.mappedBy!==undefined)mapped.mapped_by=p.mappedBy;
+   if(p.mappedAt!==undefined)mapped.mapped_at=p.mappedAt;
+   if(p.connectedPathId!==undefined)mapped.connected_path_id=p.connectedPathId;
+   if(p.connectedTargetJunctionId!==undefined)mapped.connected_target_junction_id=p.connectedTargetJunctionId;
+ } else mapped=target.map(p);
+ const query=item.action==='DELETE'?nativeSupabase.from(target.table).delete().eq('id',item.recordId):item.action==='UPDATE'?nativeSupabase.from(target.table).update(mapped).eq('id',item.recordId):nativeSupabase.from(target.table).upsert(mapped,{onConflict:'id'});
  const {error}=await query; if(error)throw error;
 }
 
