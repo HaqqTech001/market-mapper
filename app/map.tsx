@@ -6,16 +6,19 @@ import { NativeFieldMap } from '@/src/native/NativeFieldMap';
 import { nativeLocationService } from '@/src/native/locationService';
 import { NativePathRecorder } from '@/src/native/NativePathRecorder';
 import { saveQuickBusiness, saveQuickJunction, saveQuickIssue } from '@/src/native/fieldCapture';
+import { getAssignedNativeMissions, requireNativeUserContext, type NativeMissionContext, type NativeUserContext } from '@/src/native/userContext';
 import { saveQuickBusiness, saveQuickIssue, saveQuickJunction } from '@/src/native/fieldCapture';
 
 const recorder = new NativePathRecorder();
-const TEMP_MISSION_ID = 'native-field-session'; // replaced by selected mission in mission-flow port
 
 export default function MapScreen() {
   const [permission, setPermission] = useState<'checking' | 'granted' | 'denied' | 'services_disabled'>('checking');
   const [current, setCurrent] = useState<LatLng | null>(null);
   const [snapshot, setSnapshot] = useState(recorder.getSnapshot());
   const [busy, setBusy] = useState(false);
+  const [userContext, setUserContext] = useState<NativeUserContext | null>(null);
+  const [mission, setMission] = useState<NativeMissionContext | null>(null);
+  const [contextError, setContextError] = useState<string | null>(null);
   const [capture, setCapture] = useState<'business' | 'junction' | 'issue' | null>(null);
   const [captureText, setCaptureText] = useState('');
   const subscription = useRef<LocationSubscription | null>(null);
@@ -51,10 +54,20 @@ export default function MapScreen() {
   useEffect(() => {
     (async () => {
       try {
+        const user = await requireNativeUserContext();
+        setUserContext(user);
+        const missions = await getAssignedNativeMissions(user.userId);
+        setMission(missions[0] ?? null);
+        if (missions.length === 0) setContextError('NO_ASSIGNED_MISSION');
         setSnapshot(await recorder.recover());
       } catch (error) {
+        setContextError(error instanceof Error ? error.message : 'AUTH_REQUIRED');
+        console.error('Native user context failed', error);
+      }
+      try {
         console.error('Path recovery failed', error);
       }
+      } catch (error) { console.error('Path recovery failed', error); }
       await ensureLocation();
     })();
     return () => subscription.current?.remove();
@@ -65,6 +78,8 @@ export default function MapScreen() {
     try { setSnapshot(await action()); } finally { setBusy(false); }
   };
 
+  if (contextError === 'AUTH_REQUIRED') return <Centered title="Sign in is required before field mapping." />;
+  if (contextError === 'ACCOUNT_INACTIVE') return <Centered title="This account is inactive. Contact an administrator." />;
   if (permission === 'checking') return <Centered title="Preparing field map…" loading />;
   if (permission !== 'granted') {
     return <Centered title={permission === 'services_disabled' ? 'Location services are off' : 'Location permission is required'} action={ensureLocation} />;
@@ -86,7 +101,8 @@ export default function MapScreen() {
         <Pressable disabled={busy} style={styles.primary} onPress={async () => {
           setBusy(true);
           try {
-            await recorder.save('current-user');
+            if (!userContext) throw new Error('Authenticated user is required.');
+            await recorder.save(userContext.userId);
             setSnapshot(recorder.getSnapshot());
           } catch (error) {
             Alert.alert('Could not save path', error instanceof Error ? error.message : 'Please try again.');
@@ -104,6 +120,7 @@ export default function MapScreen() {
     <View style={styles.screen}>
       <NativeFieldMap currentLocation={current} path={path} />
       <View style={styles.hud}>
+        <Text style={styles.missionText}>{mission ? mission.title : 'No assigned mission'}</Text>
         <View style={styles.hudTop}>
           <Text style={styles.state}>{snapshot.status === 'recording' ? snapshot.movementState : snapshot.status.toUpperCase()}</Text>
           <Text style={styles.gps}>{current ? 'GPS LIVE' : 'GPS SEARCHING'}</Text>
@@ -121,19 +138,19 @@ export default function MapScreen() {
       {snapshot.status === 'recording' || snapshot.status === 'paused' ? (
         <View style={styles.captureActions}>
           <Pressable style={styles.captureButton} onPress={async () => {
-            if (!current || !snapshot.missionId) return;
+            if (!current || !snapshot.missionId || !userContext) return;
             const before = recorder.getSnapshot().status;
             try {
-              await saveQuickBusiness({ missionId: snapshot.missionId, userId: 'current-user', pathSessionId: snapshot.sessionId, latitude: current.latitude, longitude: current.longitude }, { businessType: 'shop', activity: 'sells_goods', noVisibleName: true, relativePosition: 'unclear' });
+              await saveQuickBusiness({ missionId: snapshot.missionId, userId: userContext?.userId || '', pathSessionId: snapshot.sessionId, latitude: current.latitude, longitude: current.longitude }, { businessType: 'shop', activity: 'sells_goods', noVisibleName: true, relativePosition: 'unclear' });
               if (recorder.getSnapshot().status !== before) throw new Error('Capture changed recorder state unexpectedly.');
               Alert.alert('Business saved', 'Quick business draft saved. Open full business capture to complete details.');
             } catch (error) { Alert.alert('Business capture failed', error instanceof Error ? error.message : 'Please try again.'); }
           }}><Text style={styles.captureText}>+ Business</Text></Pressable>
           <Pressable style={styles.captureButton} onPress={async () => {
-            if (!current || !snapshot.missionId || !snapshot.sessionId) return;
+            if (!current || !snapshot.missionId || !snapshot.sessionId || !userContext) return;
             const before = recorder.getSnapshot().status;
             try {
-              await saveQuickJunction({ missionId: snapshot.missionId, userId: 'current-user', pathSessionId: snapshot.sessionId, latitude: current.latitude, longitude: current.longitude }, { junctionType: 'unknown' });
+              await saveQuickJunction({ missionId: snapshot.missionId, userId: userContext?.userId || '', pathSessionId: snapshot.sessionId, latitude: current.latitude, longitude: current.longitude }, { junctionType: 'unknown' });
               if (recorder.getSnapshot().status !== before) throw new Error('Capture changed recorder state unexpectedly.');
               Alert.alert('Junction saved', 'Junction recorded without stopping the active path.');
             } catch (error) { Alert.alert('Junction capture failed', error instanceof Error ? error.message : 'Please try again.'); }
@@ -142,7 +159,7 @@ export default function MapScreen() {
             if (!current || !snapshot.missionId) return;
             const before = recorder.getSnapshot().status;
             try {
-              await saveQuickIssue({ missionId: snapshot.missionId, userId: 'current-user', pathSessionId: snapshot.sessionId, latitude: current.latitude, longitude: current.longitude }, { issueType: 'other', title: 'Field issue', description: 'Needs details' });
+              await saveQuickIssue({ missionId: snapshot.missionId, userId: userContext?.userId || '', pathSessionId: snapshot.sessionId, latitude: current.latitude, longitude: current.longitude }, { issueType: 'other', title: 'Field issue', description: 'Needs details' });
               if (recorder.getSnapshot().status !== before) throw new Error('Capture changed recorder state unexpectedly.');
               Alert.alert('Issue saved', 'Field issue draft saved without stopping the path.');
             } catch (error) { Alert.alert('Issue capture failed', error instanceof Error ? error.message : 'Please try again.'); }
@@ -151,7 +168,7 @@ export default function MapScreen() {
       ) : null}
       <View style={styles.actions}>
         {snapshot.status === 'idle' ? (
-          <Pressable disabled={busy} style={styles.primary} onPress={() => run(() => recorder.start(TEMP_MISSION_ID))}><Text style={styles.primaryText}>Start Path</Text></Pressable>
+          <Pressable disabled={busy} style={styles.primary} onPress={() => { if (!mission) { Alert.alert('No active mission', 'You need an assigned mission before starting field mapping.'); return; } run(() => recorder.start(mission.id)); }}><Text style={styles.primaryText}>Start Path</Text></Pressable>
         ) : snapshot.status === 'recording' ? (
           <>
             <Pressable disabled={busy} style={styles.secondary} onPress={() => run(() => recorder.pause())}><Text style={styles.secondaryText}>Pause</Text></Pressable>
@@ -175,7 +192,7 @@ export default function MapScreen() {
               if (!current || !capture || !snapshot.missionId) return;
               setBusy(true);
               try {
-                const context = { missionId: snapshot.missionId, userId: 'current-user', pathSessionId: snapshot.sessionId, latitude: current.latitude, longitude: current.longitude };
+                const context = { missionId: snapshot.missionId, userId: userContext?.userId || '', pathSessionId: snapshot.sessionId, latitude: current.latitude, longitude: current.longitude };
                 if (capture === 'business') await saveQuickBusiness(context, { name: captureText, businessType: 'shop', activity: 'sells_goods' });
                 if (capture === 'junction') await saveQuickJunction(context, { junctionType: 'unknown', displayName: captureText || undefined });
                 if (capture === 'issue') await saveQuickIssue(context, { issueType: 'other', title: 'Field issue', description: captureText || 'Field issue reported during mapping.' });
@@ -204,6 +221,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F7FAF8' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24, backgroundColor: '#F7FAF8' },
   hud: { position: 'absolute', left: 16, right: 16, top: 16, padding: 14, borderRadius: 14, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#D1D5DB' },
+  missionText: { fontSize: 13, fontWeight: '800', color: '#374151', marginBottom: 8 },
   hudTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   state: { fontSize: 14, fontWeight: '900', color: '#065F46', letterSpacing: 1 },
   gps: { fontSize: 12, fontWeight: '800', color: '#374151' },
