@@ -9,7 +9,7 @@ import { ChatChannel, ChatMessage, UserRole, SyncStatus } from '../../types';
 import { OutboxRepository } from './OutboxRepository';
 
 export class ChatRepository {
-  private static db = getDatabase();
+  private static get db() { return getDatabase(); }
 
   static async getOrCreateChannel(
     name: string,
