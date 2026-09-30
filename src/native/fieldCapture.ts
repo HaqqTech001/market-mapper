@@ -20,7 +20,7 @@ export type FieldCaptureContext = {
 
 export async function saveQuickBusiness(
   context: FieldCaptureContext,
-  input: { name?: string; noVisibleName?: boolean; businessType: BusinessType; activity: BusinessActivity; stability?: BusinessStability; relativePosition?: RelativeBusinessPosition; notes?: string; shopNumber?: string; sectionName?: string; lineName?: string; primaryCategoryId?: string; offerings?: { catalogueItemId?: string; pendingSuggestionId?: string; name: string; itemType: CatalogueItemType; howEstablished: BusinessOfferingObservation }[] },
+  input: { name?: string; noVisibleName?: boolean; businessType: BusinessType; activity: BusinessActivity; stability?: BusinessStability; relativePosition?: RelativeBusinessPosition; notes?: string; shopNumber?: string; sectionName?: string; lineName?: string; primaryCategoryId?: string; photoDeclined?: boolean; localPhotoUri?: string; offerings?: { catalogueItemId?: string; pendingSuggestionId?: string; name: string; itemType: CatalogueItemType; howEstablished: BusinessOfferingObservation }[] },
 ): Promise<Business> {
   const now = new Date().toISOString();
   const id = `biz_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -51,8 +51,9 @@ export async function saveQuickBusiness(
     lineName: input.lineName,
     primaryCategoryId: input.primaryCategoryId,
     stability: input.stability ?? 'unknown',
-    photoDeclined: false,
-    photoState: 'not_captured',
+    localPhotoUri: input.localPhotoUri,
+    photoDeclined: !!input.photoDeclined,
+    photoState: input.localPhotoUri ? 'captured' : input.photoDeclined ? 'declined' : 'not_captured',
     notes: input.notes,
     completenessScore: 55,
     status: 'pending',
