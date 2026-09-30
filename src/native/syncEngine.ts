@@ -46,6 +46,11 @@ async function apply(item:OutboxQueueItem){
  let mapped:Payload;
  if(item.tableName==='local_notifications' && item.action==='UPDATE'){
    mapped={is_read:!!p.isRead};
+ } else if(item.tableName==='local_handovers' && item.action==='UPDATE' && p.authoritativeAccept){
+   const {data,error}=await nativeSupabase.rpc('accept_handover_atomic',{target_handover_id:item.recordId});
+   if(error)throw error;
+   if(!data?.accepted)throw new Error('HANDOVER_STALE:'+String(data?.reason||data?.status||'assignment_changed'));
+   return;
  } else if(item.tableName==='local_handovers' && item.action==='UPDATE'){
    mapped={};
    if(p.status!==undefined)mapped.status=p.status;
@@ -78,7 +83,7 @@ export async function syncPendingOutbox(limit=50){
    try{await apply(item);await OutboxRepository.markSynced(item.id);await markLocalSynced(item.tableName,item.recordId);synced++;}
    catch(error){
      const message=error instanceof Error?error.message:String(error);
-     const conflict=/409|conflict|duplicate key|version/i.test(message);
+     const conflict=/409|conflict|duplicate key|version|HANDOVER_STALE/i.test(message);
      if(conflict) await OutboxRepository.markConflict(item.id,message);
      else await OutboxRepository.markFailed(item.id,message);
      failed++;
