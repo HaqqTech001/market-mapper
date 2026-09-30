@@ -24,7 +24,7 @@ export interface SearchableOfferItem {
 }
 
 export class CatalogueRepository {
-  private static db = getDatabase();
+  private static get db() { return getDatabase(); }
 
   /**
    * Retrieves all active categories ordered by sortOrder
