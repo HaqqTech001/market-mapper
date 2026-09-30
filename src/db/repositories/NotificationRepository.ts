@@ -8,7 +8,7 @@ import { NotificationItem, NotificationType, SyncStatus } from '../../types';
 import { OutboxRepository } from './OutboxRepository';
 
 export class NotificationRepository {
-  private static db = getDatabase();
+  private static get db() { return getDatabase(); }
 
   static async createNotification(item: {
     id?: string;
