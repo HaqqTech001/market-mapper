@@ -147,8 +147,8 @@ export class MissionRepository {
     ).filter(Boolean);
 
     if (missionIds.length === 0) {
-      // Return active/scheduled missions as fallbacks
-      return this.getAllMissions();
+      // Production-safe: an unassigned user has no missions.
+      return [];
     }
 
     const all = await this.getAllMissions();
