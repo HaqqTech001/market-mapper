@@ -446,6 +446,7 @@ export type GpsQualityStatus = 'good' | 'fair' | 'poor' | 'searching';
 export type GpsEngineRejectionReason =
   | 'duplicate'
   | 'stale'
+  | 'invalid_coordinate'
   | 'impossible_jump'
   | 'poor_accuracy_excluded'
   | 'stationary_noise';
