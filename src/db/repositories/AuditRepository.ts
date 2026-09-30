@@ -19,7 +19,7 @@ export interface AuditLogItem {
 }
 
 export class AuditRepository {
-  private static db = getDatabase();
+  private static get db() { return getDatabase(); }
 
   static async logAction(item: {
     actionType: string;
