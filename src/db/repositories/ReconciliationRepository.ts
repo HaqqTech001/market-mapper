@@ -11,7 +11,7 @@ import { NotificationRepository } from './NotificationRepository';
 import { MissionRepository } from './MissionRepository';
 
 export class ReconciliationRepository {
-  private static db = getDatabase();
+  private static get db() { return getDatabase(); }
 
   static async submitReconciliation(item: {
     id?: string;
