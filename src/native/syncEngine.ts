@@ -38,6 +38,17 @@ async function apply(item:OutboxQueueItem){
  let mapped:Payload;
  if(item.tableName==='local_notifications' && item.action==='UPDATE'){
    mapped={is_read:!!p.isRead};
+ } else if(item.tableName==='local_handovers' && item.action==='UPDATE'){
+   mapped={};
+   if(p.status!==undefined)mapped.status=p.status;
+   mapped.updated_at=p.updatedAt||p.updated_at||new Date().toISOString();
+ } else if(item.tableName==='local_revisits' && item.action==='UPDATE'){
+   mapped={};
+   if(p.status!==undefined)mapped.status=p.status;
+   if(p.resolvedBy!==undefined)mapped.resolved_by=p.resolvedBy;
+   if(p.resolutionNotes!==undefined)mapped.resolution_notes=p.resolutionNotes;
+   if(p.resolvedAt!==undefined)mapped.resolved_at=p.resolvedAt;
+   mapped.updated_at=p.updatedAt||p.updated_at||new Date().toISOString();
  } else if(item.tableName==='local_chat_messages' && item.action==='UPDATE'){
    mapped={};
    if(p.isPinned!==undefined)mapped.is_pinned=!!p.isPinned;
