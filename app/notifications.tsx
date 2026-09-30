@@ -4,12 +4,13 @@ import { router, useFocusEffect } from 'expo-router';
 import { NotificationRepository } from '@/src/db/repositories/NotificationRepository';
 import { requireNativeUserContext, type NativeUserContext } from '@/src/native/userContext';
 import { runNativeSync } from '@/src/native/syncCoordinator';
+import { subscribeOperationalData } from '@/src/native/operationalEvents';
 import type { NotificationItem } from '@/src/types';
 
 export default function NotificationsScreen(){
  const [user,setUser]=useState<NativeUserContext|null>(null); const [items,setItems]=useState<NotificationItem[]>([]); const [loading,setLoading]=useState(true);
  const load=useCallback(async()=>{if(user)setItems(await NotificationRepository.getNotificationsForUser(user.userId))},[user]);
- useFocusEffect(useCallback(()=>{load()},[load]));
+ useFocusEffect(useCallback(()=>{load();return subscribeOperationalData(()=>{load()})},[load]));
  useEffect(()=>{let mounted=true;(async()=>{try{const u=await requireNativeUserContext();if(!mounted)return;setUser(u);setItems(await NotificationRepository.getNotificationsForUser(u.userId))}finally{if(mounted)setLoading(false)}})();return()=>{mounted=false}},[]);
  const open=async(n:NotificationItem)=>{if(!n.isRead){await NotificationRepository.markAsRead(n.id);await load();runNativeSync().catch(()=>{})}const t=n.entityReferenceType;if(t==='mission')router.push('/missions');else if(['business','path','junction','place','field_issue'].includes(String(t)))router.push('/map')};
  const markAll=async()=>{if(!user)return;await NotificationRepository.markAllAsRead(user.userId);await load();runNativeSync().catch(()=>{})};
