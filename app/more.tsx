@@ -9,8 +9,8 @@ export default function MoreScreen(){
  return <View style={s.page}><View style={s.header}><Text style={s.eyebrow}>MORE</Text><Text style={s.title}>{user?.fullName||'Field account'}</Text><Text style={s.role}>{user?.role.replace('_',' ')||''}</Text></View><ScrollView contentContainerStyle={s.body}>
   <Item title="Notifications" sub="Mission, chat and system updates" onPress={()=>router.push('/notifications')}/>
   <Item title="Offline Data" sub="Pending sync, failed items and conflicts" onPress={()=>router.push('/offline-data')}/>
-  <Item title="Revisits" sub="Work marked to verify or return to" onPress={()=>router.push('/offline-data')}/>
-  {user?.role==='team_lead'||user?.role==='admin'?<><Text style={s.section}>COORDINATION</Text><Item title="Assignments & Handovers" sub="Coordinate remaining field work" onPress={()=>router.push('/missions')}/><Item title="Field Issues" sub="Review reported operational issues" onPress={()=>router.push('/map')}/></>:null}
+  <Item title="Revisits" sub="Work marked to verify or return to" onPress={()=>router.push('/revisits')}/>
+  {user?.role==='team_lead'||user?.role==='admin'?<><Text style={s.section}>COORDINATION</Text><Item title="Assignments & Handovers" sub="Coordinate remaining field work" onPress={()=>router.push('/handovers')}/><Item title="Field Issues" sub="Review reported operational issues" onPress={()=>router.push('/field-issues')}/></>:null}
   {user?.role==='admin'?<><Text style={s.section}>ADMIN</Text><Item title="Admin Workspace" sub="Users · teams · missions · catalogue" onPress={()=>{}}/><Item title="Catalogue" sub="Categories, products, services and suggestions" onPress={()=>{}}/></>:null}
   <Text style={s.section}>ACCOUNT</Text><Pressable style={s.signout} onPress={async()=>{await nativeSupabase.auth.signOut();router.replace('/')}}><Text style={s.signoutText}>Sign Out</Text></Pressable>
  </ScrollView></View>
