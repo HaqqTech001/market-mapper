@@ -7,7 +7,6 @@ import { nativeLocationService } from '@/src/native/locationService';
 import { NativePathRecorder } from '@/src/native/NativePathRecorder';
 import { saveQuickBusiness, saveQuickJunction, saveQuickIssue } from '@/src/native/fieldCapture';
 import { getAssignedNativeMissions, requireNativeUserContext, type NativeMissionContext, type NativeUserContext } from '@/src/native/userContext';
-import { saveQuickBusiness, saveQuickIssue, saveQuickJunction } from '@/src/native/fieldCapture';
 
 const recorder = new NativePathRecorder();
 
@@ -59,15 +58,17 @@ export default function MapScreen() {
         const missions = await getAssignedNativeMissions(user.userId);
         setMission(missions[0] ?? null);
         if (missions.length === 0) setContextError('NO_ASSIGNED_MISSION');
-        setSnapshot(await recorder.recover());
       } catch (error) {
         setContextError(error instanceof Error ? error.message : 'AUTH_REQUIRED');
         console.error('Native user context failed', error);
       }
+
       try {
+        setSnapshot(await recorder.recover());
+      } catch (error) {
         console.error('Path recovery failed', error);
       }
-      } catch (error) { console.error('Path recovery failed', error); }
+
       await ensureLocation();
     })();
     return () => subscription.current?.remove();
