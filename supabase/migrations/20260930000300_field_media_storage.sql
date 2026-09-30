@@ -14,7 +14,7 @@ using (bucket_id='field-media' and ((storage.foldername(name))[1]=auth.uid()::te
 create policy "field users update own media"
 on storage.objects for update to authenticated
 using (bucket_id='field-media' and ((storage.foldername(name))[1]=auth.uid()::text or public.is_admin()))
-with check (bucket_id='field-media' and ((storage.foldername(name))[1]=auth.uid()::text or public.is_admin());
+with check (bucket_id='field-media' and ((storage.foldername(name))[1]=auth.uid()::text or public.is_admin()));
 
 create policy "field users delete own media"
 on storage.objects for delete to authenticated
