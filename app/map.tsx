@@ -11,6 +11,8 @@ import { getAssignedNativeMissions, requireNativeUserContext, type NativeMission
 import { NativeBusinessCapture, NativeIssueCapture, NativeJunctionPicker, NativePlaceCapture, type BusinessCaptureValue } from '@/src/native/NativeCaptureSheets';
 import { RemainingBranchesSheet } from '@/src/native/RemainingBranchesSheet';
 import { persistBusinessPhoto } from '@/src/native/businessMedia';
+import { ReviewRestartSheet } from '@/src/native/ReviewRestartSheet';
+import type { LocalPathJunction, RawGpsSample } from '@/src/types';
 import { PathRepository } from '@/src/db/repositories/PathRepository';
 import { getNativeSyncSnapshot, retryNativeSync, runNativeSync, type NativeSyncSnapshot } from '@/src/native/syncCoordinator';
 
@@ -26,6 +28,9 @@ export default function MapScreen() {
   const [contextError, setContextError] = useState<string | null>(null);
   const [capture, setCapture] = useState<'business' | 'junction' | 'place' | 'issue' | null>(null);
   const [showBranches, setShowBranches] = useState(false);
+  const [showRestart, setShowRestart] = useState(false);
+  const [reviewPoints, setReviewPoints] = useState<RawGpsSample[]>([]);
+  const [reviewJunctions, setReviewJunctions] = useState<LocalPathJunction[]>([]);
   const [sync, setSync] = useState<NativeSyncSnapshot>({ state: 'saved', relationalPending: 0, mediaPending: 0 });
   const [syncBusy, setSyncBusy] = useState(false);
   const [branchTarget, setBranchTarget] = useState<{ branchId: string; label: string; latitude: number; longitude: number } | null>(null);
@@ -172,6 +177,7 @@ export default function MapScreen() {
           </>
         )}
       </View>
+      {snapshot.status === 'reviewing' ? <ReviewRestartSheet visible={showRestart} points={reviewPoints} junctions={reviewJunctions} onClose={()=>setShowRestart(false)} onPoint={async(id)=>{await recorder.restartFromPoint(id);setSnapshot(recorder.getSnapshot())}} onJunction={async(id)=>{await recorder.restartFromJunction(id);setSnapshot(recorder.getSnapshot())}} /> : null}
       {mission && userContext ? <RemainingBranchesSheet visible={showBranches} missionId={mission.id} userId={userContext.userId} onClose={() => setShowBranches(false)} onSelect={({junction, branch}) => setBranchTarget({ branchId: branch.id, label: `${junction.operationalLabel} · ${branch.label}`, latitude: junction.latitude, longitude: junction.longitude })} /> : null}
       <NativeBusinessCapture visible={capture === 'business'} onClose={() => setCapture(null)} onSave={async (value: BusinessCaptureValue) => {
         if (!current || !snapshot.missionId || !userContext) throw new Error('Mapping context is unavailable.');
