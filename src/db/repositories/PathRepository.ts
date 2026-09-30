@@ -11,6 +11,7 @@
  */
 
 import { getDatabase } from '../sqlite';
+import { OutboxRepository } from './OutboxRepository';
 import {
   MarketPath,
   PathPointRaw,
@@ -184,6 +185,7 @@ export class PathRepository {
         now,
       ]
     );
+    await OutboxRepository.enqueue('path_junctions', junction.id, 'INSERT', junction as unknown as Record<string, unknown>);
   }
 
   /**
@@ -1061,13 +1063,16 @@ export class PathRepository {
       `UPDATE local_junction_branches SET status = 'in_progress', mapped_by = ? WHERE id = ? AND status IN ('unmapped', 'in_progress');`,
       [mappedBy, branchId]
     );
+    await OutboxRepository.enqueue('junction_branches', branchId, 'UPDATE', { id: branchId, status: 'in_progress', mappedBy });
   }
 
   static async markBranchMapped(branchId: string, connectedPathId: string, mappedBy: string, connectedTargetJunctionId?: string): Promise<void> {
+    const mappedAt = new Date().toISOString();
     await this.db.runAsync(
       `UPDATE local_junction_branches SET status = 'mapped', connected_path_id = ?, connected_target_junction_id = ?, mapped_at = ?, mapped_by = ? WHERE id = ?;`,
-      [connectedPathId, connectedTargetJunctionId || null, new Date().toISOString(), mappedBy, branchId]
+      [connectedPathId, connectedTargetJunctionId || null, mappedAt, mappedBy, branchId]
     );
+    await OutboxRepository.enqueue('junction_branches', branchId, 'UPDATE', { id: branchId, status: 'mapped', connectedPathId, connectedTargetJunctionId: connectedTargetJunctionId || null, mappedAt, mappedBy });
   }
 
   /**
