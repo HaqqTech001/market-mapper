@@ -8,6 +8,7 @@ import { NativePathRecorder } from '@/src/native/NativePathRecorder';
 import { savePlaceDuringPath, saveQuickBusiness, saveQuickJunction, saveQuickIssue } from '@/src/native/fieldCapture';
 import { getAssignedNativeMissions, requireNativeUserContext, type NativeMissionContext, type NativeUserContext } from '@/src/native/userContext';
 import { NativeBusinessCapture, NativeIssueCapture, NativeJunctionPicker, NativePlaceCapture, type BusinessCaptureValue } from '@/src/native/NativeCaptureSheets';
+import { RemainingBranchesSheet } from '@/src/native/RemainingBranchesSheet';
 
 const recorder = new NativePathRecorder();
 
@@ -20,6 +21,8 @@ export default function MapScreen() {
   const [mission, setMission] = useState<NativeMissionContext | null>(null);
   const [contextError, setContextError] = useState<string | null>(null);
   const [capture, setCapture] = useState<'business' | 'junction' | 'place' | 'issue' | null>(null);
+  const [showBranches, setShowBranches] = useState(false);
+  const [branchTarget, setBranchTarget] = useState<{ label: string; latitude: number; longitude: number } | null>(null);
   const subscription = useRef<LocationSubscription | null>(null);
 
   const path = snapshot.acceptedPoints.map((p) => ({ latitude: p.latitude, longitude: p.longitude }));
@@ -92,6 +95,7 @@ export default function MapScreen() {
         <Text style={styles.eyebrow}>PATH REVIEW</Text>
         <Text style={styles.reviewTitle}>Check this path before saving</Text>
         <View style={styles.reviewMap}><NativeFieldMap currentLocation={current} path={path} /></View>
+        {branchTarget ? <Text style={styles.branchTarget}>Return to {branchTarget.label} to map the selected branch.</Text> : null}
         <View style={styles.metrics}>
           <Metric label="Distance" value={formatDistance(snapshot.distanceMeters)} />
           <Metric label="Total time" value={formatTime(snapshot.durationSeconds)} />
@@ -137,6 +141,7 @@ export default function MapScreen() {
         <Pressable style={styles.captureButton} onPress={() => setCapture('junction')}><Text style={styles.captureText}>Junction</Text></Pressable>
         <Pressable style={styles.captureButton} onPress={() => setCapture('issue')}><Text style={styles.captureText}>Issue</Text></Pressable>
       </View> : null}
+      {snapshot.status === 'idle' && mission && userContext ? <Pressable style={styles.branchesButton} onPress={() => setShowBranches(true)}><Text style={styles.branchesText}>Remaining Branches</Text></Pressable> : null}
       <View style={styles.actions}>
         {snapshot.status === 'idle' ? (
           <Pressable disabled={busy} style={styles.primary} onPress={() => { if (!mission) { Alert.alert('No active mission', 'You need an assigned mission before starting field mapping.'); return; } run(() => recorder.start(mission.id)); }}><Text style={styles.primaryText}>Start Path</Text></Pressable>
@@ -152,6 +157,7 @@ export default function MapScreen() {
           </>
         )}
       </View>
+      {mission && userContext ? <RemainingBranchesSheet visible={showBranches} missionId={mission.id} userId={userContext.userId} onClose={() => setShowBranches(false)} onSelect={({junction}) => setBranchTarget({ label: junction.operationalLabel, latitude: junction.latitude, longitude: junction.longitude })} /> : null}
       <NativeBusinessCapture visible={capture === 'business'} onClose={() => setCapture(null)} onSave={async (value: BusinessCaptureValue) => {
         if (!current || !snapshot.missionId || !userContext) throw new Error('Mapping context is unavailable.');
         const before = recorder.getSnapshot().status;
@@ -209,6 +215,9 @@ const styles = StyleSheet.create({
   captureActions: { position: 'absolute', left: 16, right: 16, bottom: 88, flexDirection: 'row', gap: 8 },
   captureButton: { minHeight: 48, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#065F46', paddingHorizontal: 8 },
   captureText: { color: '#065F46', fontSize: 13, fontWeight: '900' },
+  branchTarget: { marginTop: 8, padding: 8, borderRadius: 8, backgroundColor: '#FFFBEB', color: '#92400E', fontSize: 13, fontWeight: '800' },
+  branchesButton: { position: 'absolute', left: 16, right: 16, bottom: 88, minHeight: 50, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#047857' },
+  branchesText: { color: '#047857', fontSize: 15, fontWeight: '900' },
   actions: { position: 'absolute', left: 16, right: 16, bottom: 20, flexDirection: 'row', gap: 12 },
   primary: { minHeight: 52, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: '#047857', paddingHorizontal: 18 },
   primaryText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
