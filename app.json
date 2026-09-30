@@ -31,7 +31,14 @@
           "locationAlwaysAndWhenInUsePermission": "Allow Market Mapper to continue recording an active market path when background location is enabled."
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Market Mapper to select a field photo for a mapped business.",
+          "cameraPermission": "Allow Market Mapper to take field photos for mapped businesses."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
