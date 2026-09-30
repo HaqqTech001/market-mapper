@@ -140,9 +140,14 @@ export class NativePathRecorder {
 
   async getReviewTargets() {
     if (!this.snapshot.sessionId) return { points: [], junctions: [] };
-    const recovered = await PathRepository.getSessionById(this.snapshot.sessionId);
-    if (!recovered) return { points: [], junctions: [] };
-    return { points: recovered.points.filter(p=>p.accepted), junctions: recovered.junctions.filter(j=>!j.isExcluded) };
+    const recovered = await PathRepository.getActiveSession();
+    if (!recovered.session || recovered.session.sessionId !== this.snapshot.sessionId) {
+      return { points: [], junctions: [] };
+    }
+    return {
+      points: recovered.points.filter((p) => p.accepted),
+      junctions: recovered.junctions.filter((j) => !j.isExcluded),
+    };
   }
 
   async restartFromPoint(pointId: string) {
@@ -186,7 +191,7 @@ export class NativePathRecorder {
     const raw = await PathRepository.getRawPointsForSession(this.snapshot.sessionId);
     const accepted = raw.filter((p) => p.accepted).sort((a,b)=>a.sequenceNumber-b.sequenceNumber);
     const distance = accepted.slice(1).reduce((sum,p,i)=>sum + distanceMeters(accepted[i],p),0);
-    this.snapshot = { ...this.snapshot, acceptedPoints: accepted.map(p=>({latitude:p.latitude,longitude:p.longitude})), sequence: raw.length, distanceMeters: distance };
+    this.snapshot = { ...this.snapshot, acceptedPoints: accepted, sequenceNumber: raw.reduce((max, p) => Math.max(max, p.sequenceNumber), 0), distanceMeters: distance };
   }
 
   async save(userId: string, name?: string) {
