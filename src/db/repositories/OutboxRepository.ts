@@ -7,7 +7,7 @@ import { getDatabase } from '../sqlite';
 import { OutboxQueueItem, OutboxAction } from '../../types';
 
 export class OutboxRepository {
-  private static db = getDatabase();
+  private static get db() { return getDatabase(); }
 
   static async enqueue(
     tableName: string,
