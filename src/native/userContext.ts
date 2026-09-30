@@ -10,6 +10,7 @@ export type NativeUserContext = {
 export type NativeMissionContext = {
   id: string;
   title: string;
+  marketId: string;
   description?: string | null;
   status: string;
   roleInMission: string;
@@ -40,13 +41,14 @@ export async function requireNativeUserContext(): Promise<NativeUserContext> {
 export async function getAssignedNativeMissions(userId: string): Promise<NativeMissionContext[]> {
   const { data, error } = await nativeSupabase
     .from('mission_members')
-    .select('role, missions!inner(id, title, description, status)')
+    .select('role, missions!inner(id, market_id, title, description, status)')
     .eq('user_id', userId);
   if (error) throw error;
 
   return (data ?? []).map((row: any) => ({
     id: row.missions.id,
     title: row.missions.title,
+    marketId: row.missions.market_id,
     description: row.missions.description,
     status: row.missions.status,
     roleInMission: row.role,
