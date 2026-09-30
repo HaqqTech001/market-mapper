@@ -8,6 +8,7 @@ import { getDatabase } from '../sqlite';
 import { Handover, HandoverChecklist, HandoverStatus, SyncStatus } from '../../types';
 import { OutboxRepository } from './OutboxRepository';
 import { NotificationRepository } from './NotificationRepository';
+import { nativeSupabase } from '../../native/supabase';
 
 export class HandoverRepository {
   private static get db() { return getDatabase(); }
@@ -136,7 +137,19 @@ export class HandoverRepository {
     );
 
     if (newStatus === 'accepted') {
-      // Race condition check: Verify current area assignment hasn't been reassigned to a third party
+      // Prefer authoritative atomic cloud transfer. If offline/unreachable, retain the local
+      // acceptance as pending sync; the server will still reject it as stale if assignment changed.
+      try {
+        const { data, error } = await nativeSupabase.rpc('accept_handover_atomic', { target_handover_id: id });
+        if (error) throw error;
+        if (!data?.accepted) {
+          await this.db.runAsync(`UPDATE local_handovers SET status='stale', updated_at=? WHERE id=?;`, [now, id]);
+          return false;
+        }
+      } catch (error) {
+        console.warn('Handover cloud acceptance deferred; local state remains pending sync', error);
+      }
+      // Local race check protects offline continuity until authoritative sync/reconciliation.
       const currentAssign = await this.db.getFirstAsync<any>(
         `SELECT assigned_to_user_id FROM local_mission_area_assignments WHERE mission_id = ? AND area_id = ?;`,
         [handover.missionId, handover.areaId]
