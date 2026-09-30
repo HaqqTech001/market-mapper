@@ -64,14 +64,6 @@ export class ChatRepository {
       `SELECT * FROM local_chat_channels ORDER BY created_at ASC;`
     );
 
-    if (rows.length === 0) {
-      // Seed default channels for out-of-the-box operations
-      const defaultTeam = await this.getOrCreateChannel('Lagos West Alpha Channel', 'team', 'team_alpha_01');
-      const announcements = await this.getOrCreateChannel('Operational Announcements', 'announcements');
-      const missionComms = await this.getOrCreateChannel('Alaba Sweep Comms', 'mission', undefined, 'mission_alaba_01');
-      return [defaultTeam, announcements, missionComms];
-    }
-
     return rows.map((r) => ({
       id: r.id,
       name: r.name,
