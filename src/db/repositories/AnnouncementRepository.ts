@@ -22,7 +22,7 @@ export interface MissionAnnouncement {
 }
 
 export class AnnouncementRepository {
-  private static db = getDatabase();
+  private static get db() { return getDatabase(); }
 
   static async createAnnouncement(item: {
     id?: string;
