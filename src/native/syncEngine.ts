@@ -43,7 +43,12 @@ export async function syncPendingOutbox(limit=50){
  const pending=await OutboxRepository.getPending(limit); let synced=0,failed=0;
  for(const item of pending){
    try{await apply(item);await OutboxRepository.markSynced(item.id);await markLocalSynced(item.tableName,item.recordId);synced++;}
-   catch(error){await OutboxRepository.markFailed(item.id,error instanceof Error?error.message:String(error));failed++;}
+   catch(error){
+     const message=error instanceof Error?error.message:String(error);
+     const conflict=/409|conflict|duplicate key|version/i.test(message);
+     await OutboxRepository.markFailed(item.id,(conflict?'CONFLICT: ':'')+message);
+     failed++;
+   }
  }
  return {attempted:pending.length,synced,failed,remaining:await OutboxRepository.countPending()};
 }
