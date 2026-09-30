@@ -46,7 +46,8 @@ export async function syncPendingOutbox(limit=50){
    catch(error){
      const message=error instanceof Error?error.message:String(error);
      const conflict=/409|conflict|duplicate key|version/i.test(message);
-     await OutboxRepository.markFailed(item.id,(conflict?'CONFLICT: ':'')+message);
+     if(conflict) await OutboxRepository.markConflict(item.id,message);
+     else await OutboxRepository.markFailed(item.id,message);
      failed++;
    }
  }
