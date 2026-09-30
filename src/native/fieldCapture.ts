@@ -104,7 +104,9 @@ export async function saveQuickJunction(
   const branches = generateDefaultBranchesForType(id, input.junctionType);
   const db = getDatabase();
   for (const branch of branches) {
-    await db.runAsync(`INSERT OR REPLACE INTO local_junction_branches (id, junction_id, label, relative_side, status, connected_path_id, connected_target_junction_id, notes, mapped_at, mapped_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`, [branch.id, branch.junctionId, branch.label, branch.relativeSide || null, branch.status, branch.connectedPathId || null, branch.connectedTargetJunctionId || null, branch.notes || null, branch.mappedAt || null, branch.mappedBy || null, new Date().toISOString()]);
+    const createdAt = new Date().toISOString();
+    await db.runAsync(`INSERT OR REPLACE INTO local_junction_branches (id, junction_id, label, relative_side, status, connected_path_id, connected_target_junction_id, notes, mapped_at, mapped_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`, [branch.id, branch.junctionId, branch.label, branch.relativeSide || null, branch.status, branch.connectedPathId || null, branch.connectedTargetJunctionId || null, branch.notes || null, branch.mappedAt || null, branch.mappedBy || null, createdAt]);
+    await OutboxRepository.enqueue('junction_branches', branch.id, 'INSERT', { ...branch, createdAt });
   }
   return { id, operationalLabel: label, branches };
 }
