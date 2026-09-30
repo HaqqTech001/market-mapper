@@ -5,6 +5,7 @@ import type { LocationSubscription } from '@/src/lib/location/locationService';
 import { NativeFieldMap } from '@/src/native/NativeFieldMap';
 import { nativeLocationService } from '@/src/native/locationService';
 import { NativePathRecorder } from '@/src/native/NativePathRecorder';
+import { saveQuickBusiness, saveQuickJunction, saveQuickIssue } from '@/src/native/fieldCapture';
 import { saveQuickBusiness, saveQuickIssue, saveQuickJunction } from '@/src/native/fieldCapture';
 
 const recorder = new NativePathRecorder();
@@ -117,6 +118,37 @@ export default function MapScreen() {
         <Pressable style={styles.captureButton} onPress={() => setCapture('junction')}><Text style={styles.captureText}>+ Junction</Text></Pressable>
         <Pressable style={styles.captureButton} onPress={() => setCapture('issue')}><Text style={styles.captureText}>Report Issue</Text></Pressable>
       </View> : null}
+      {snapshot.status === 'recording' || snapshot.status === 'paused' ? (
+        <View style={styles.captureActions}>
+          <Pressable style={styles.captureButton} onPress={async () => {
+            if (!current || !snapshot.missionId) return;
+            const before = recorder.getSnapshot().status;
+            try {
+              await saveQuickBusiness({ missionId: snapshot.missionId, userId: 'current-user', pathSessionId: snapshot.sessionId, latitude: current.latitude, longitude: current.longitude }, { businessType: 'shop', activity: 'sells_goods', noVisibleName: true, relativePosition: 'unclear' });
+              if (recorder.getSnapshot().status !== before) throw new Error('Capture changed recorder state unexpectedly.');
+              Alert.alert('Business saved', 'Quick business draft saved. Open full business capture to complete details.');
+            } catch (error) { Alert.alert('Business capture failed', error instanceof Error ? error.message : 'Please try again.'); }
+          }}><Text style={styles.captureText}>+ Business</Text></Pressable>
+          <Pressable style={styles.captureButton} onPress={async () => {
+            if (!current || !snapshot.missionId || !snapshot.sessionId) return;
+            const before = recorder.getSnapshot().status;
+            try {
+              await saveQuickJunction({ missionId: snapshot.missionId, userId: 'current-user', pathSessionId: snapshot.sessionId, latitude: current.latitude, longitude: current.longitude }, { junctionType: 'unknown' });
+              if (recorder.getSnapshot().status !== before) throw new Error('Capture changed recorder state unexpectedly.');
+              Alert.alert('Junction saved', 'Junction recorded without stopping the active path.');
+            } catch (error) { Alert.alert('Junction capture failed', error instanceof Error ? error.message : 'Please try again.'); }
+          }}><Text style={styles.captureText}>Junction</Text></Pressable>
+          <Pressable style={styles.captureButton} onPress={async () => {
+            if (!current || !snapshot.missionId) return;
+            const before = recorder.getSnapshot().status;
+            try {
+              await saveQuickIssue({ missionId: snapshot.missionId, userId: 'current-user', pathSessionId: snapshot.sessionId, latitude: current.latitude, longitude: current.longitude }, { issueType: 'other', title: 'Field issue', description: 'Needs details' });
+              if (recorder.getSnapshot().status !== before) throw new Error('Capture changed recorder state unexpectedly.');
+              Alert.alert('Issue saved', 'Field issue draft saved without stopping the path.');
+            } catch (error) { Alert.alert('Issue capture failed', error instanceof Error ? error.message : 'Please try again.'); }
+          }}><Text style={styles.captureText}>Issue</Text></Pressable>
+        </View>
+      ) : null}
       <View style={styles.actions}>
         {snapshot.status === 'idle' ? (
           <Pressable disabled={busy} style={styles.primary} onPress={() => run(() => recorder.start(TEMP_MISSION_ID))}><Text style={styles.primaryText}>Start Path</Text></Pressable>
@@ -182,6 +214,9 @@ const styles = StyleSheet.create({
   captureActions: { position: 'absolute', left: 16, right: 16, bottom: 88, flexDirection: 'row', gap: 8 },
   captureButton: { minHeight: 48, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#065F46', paddingHorizontal: 8 },
   captureText: { color: '#065F46', fontSize: 13, fontWeight: '900' },
+  captureActions: { position: 'absolute', left: 16, right: 16, bottom: 88, flexDirection: 'row', gap: 8 },
+  captureButton: { minHeight: 48, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#065F46' },
+  captureText: { color: '#065F46', fontSize: 14, fontWeight: '900' },
   actions: { position: 'absolute', left: 16, right: 16, bottom: 20, flexDirection: 'row', gap: 12 },
   primary: { minHeight: 52, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: '#047857', paddingHorizontal: 18 },
   primaryText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
