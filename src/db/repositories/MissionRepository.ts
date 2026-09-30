@@ -18,7 +18,7 @@ import {
 import { OutboxRepository } from './OutboxRepository';
 
 export class MissionRepository {
-  private static db = getDatabase();
+  private static get db() { return getDatabase(); }
 
   static async createMission(mission: {
     id?: string;
