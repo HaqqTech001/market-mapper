@@ -1,0 +1,14 @@
+import { nativeSupabase } from './supabase';
+import { getDatabase } from '@/src/db/sqlite';
+
+export async function hydrateOperationalMessaging(userId:string,missionIds:string[]){
+ const db=getDatabase();
+ const {data:channels,error:ce}=await nativeSupabase.from('chat_channels').select('*').order('created_at');if(ce)throw ce;
+ const allowed=(channels||[]).filter((c:any)=>!c.mission_id||missionIds.includes(c.mission_id));
+ for(const c of allowed)await db.runAsync("INSERT OR REPLACE INTO local_chat_channels(id,name,channel_type,team_id,mission_id,last_message_snippet,last_message_time,unread_count,is_muted,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)",[c.id,c.name,c.channel_type,c.team_id||null,c.mission_id||null,null,null,0,0,c.created_at]);
+ const ids=allowed.map((c:any)=>c.id);
+ for(const id of ids){const {data:messages,error}=await nativeSupabase.from('chat_messages').select('*').eq('channel_id',id).order('created_at',{ascending:false}).limit(100);if(error)throw error;for(const p of (messages||[]).reverse())await db.runAsync("INSERT OR IGNORE INTO local_chat_messages(id,channel_id,sender_id,sender_name,sender_avatar,sender_role,reply_to_id,text,is_pinned,linked_business_id,linked_business_name,linked_path_id,linked_path_name,linked_issue_id,linked_issue_title,shared_location_json,created_at,sync_status) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')",[p.id,p.channel_id,p.sender_id,p.sender_name,p.sender_avatar||null,p.sender_role,p.reply_to_id||null,p.text,p.is_pinned?1:0,p.linked_business_id||null,p.linked_business_name||null,p.linked_path_id||null,p.linked_path_name||null,p.linked_issue_id||null,p.linked_issue_title||null,p.shared_location?JSON.stringify(p.shared_location):null,p.created_at]);}
+ const {data:notifs,error:ne}=await nativeSupabase.from('notifications').select('*').eq('recipient_id',userId).order('created_at',{ascending:false}).limit(100);if(ne)throw ne;
+ for(const p of notifs||[])await db.runAsync("INSERT OR REPLACE INTO local_notifications(id,recipient_id,type,title,body,entity_reference_type,entity_reference_id,is_read,created_at,sync_status) VALUES(?,?,?,?,?,?,?,?,?,'synced')",[p.id,p.recipient_id,p.type,p.title,p.body,p.entity_reference_type||null,p.entity_reference_id||null,p.is_read?1:0,p.created_at]);
+ return {channels:allowed.length,notifications:(notifs||[]).length};
+}
