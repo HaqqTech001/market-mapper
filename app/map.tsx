@@ -5,9 +5,9 @@ import type { LocationSubscription } from '@/src/lib/location/locationService';
 import { NativeFieldMap } from '@/src/native/NativeFieldMap';
 import { nativeLocationService } from '@/src/native/locationService';
 import { NativePathRecorder } from '@/src/native/NativePathRecorder';
-import { saveQuickBusiness, saveQuickJunction, saveQuickIssue } from '@/src/native/fieldCapture';
+import { savePlaceDuringPath, saveQuickBusiness, saveQuickJunction, saveQuickIssue } from '@/src/native/fieldCapture';
 import { getAssignedNativeMissions, requireNativeUserContext, type NativeMissionContext, type NativeUserContext } from '@/src/native/userContext';
-import { NativeBusinessCapture, NativeJunctionPicker, type BusinessCaptureValue } from '@/src/native/NativeCaptureSheets';
+import { NativeBusinessCapture, NativeIssueCapture, NativeJunctionPicker, NativePlaceCapture, type BusinessCaptureValue } from '@/src/native/NativeCaptureSheets';
 
 const recorder = new NativePathRecorder();
 
@@ -19,7 +19,7 @@ export default function MapScreen() {
   const [userContext, setUserContext] = useState<NativeUserContext | null>(null);
   const [mission, setMission] = useState<NativeMissionContext | null>(null);
   const [contextError, setContextError] = useState<string | null>(null);
-  const [capture, setCapture] = useState<'business' | 'junction' | null>(null);
+  const [capture, setCapture] = useState<'business' | 'junction' | 'place' | 'issue' | null>(null);
   const subscription = useRef<LocationSubscription | null>(null);
 
   const path = snapshot.acceptedPoints.map((p) => ({ latitude: p.latitude, longitude: p.longitude }));
@@ -133,16 +133,9 @@ export default function MapScreen() {
       </View>
       {snapshot.status === 'recording' || snapshot.status === 'paused' ? <View style={styles.captureActions}>
         <Pressable style={styles.captureButton} onPress={() => setCapture('business')}><Text style={styles.captureText}>+ Business</Text></Pressable>
-        <Pressable style={styles.captureButton} onPress={() => setCapture('junction')}><Text style={styles.captureText}>+ Junction</Text></Pressable>
-        <Pressable style={styles.captureButton} onPress={async () => {
-          if (!current || !snapshot.missionId || !userContext) return;
-          const before = recorder.getSnapshot().status;
-          try {
-            await saveQuickIssue({ missionId: snapshot.missionId, userId: userContext.userId, pathSessionId: snapshot.sessionId, latitude: current.latitude, longitude: current.longitude }, { issueType: 'other', title: 'Field issue', description: 'Needs details' });
-            if (recorder.getSnapshot().status !== before) throw new Error('Issue capture changed path state.');
-            Alert.alert('Issue saved', 'Field issue draft saved. Path state was preserved.');
-          } catch (error) { Alert.alert('Issue capture failed', error instanceof Error ? error.message : 'Please try again.'); }
-        }}><Text style={styles.captureText}>Report Issue</Text></Pressable>
+        <Pressable style={styles.captureButton} onPress={() => setCapture('place')}><Text style={styles.captureText}>+ Place</Text></Pressable>
+        <Pressable style={styles.captureButton} onPress={() => setCapture('junction')}><Text style={styles.captureText}>Junction</Text></Pressable>
+        <Pressable style={styles.captureButton} onPress={() => setCapture('issue')}><Text style={styles.captureText}>Issue</Text></Pressable>
       </View> : null}
       <View style={styles.actions}>
         {snapshot.status === 'idle' ? (
@@ -166,6 +159,20 @@ export default function MapScreen() {
         if (recorder.getSnapshot().status !== before) throw new Error('Business capture changed path state.');
         setCapture(null);
         Alert.alert('Business saved', 'Business and offerings saved locally. Path recording state was preserved.');
+      }} />
+      <NativePlaceCapture visible={capture === 'place'} onClose={() => setCapture(null)} onSave={async (value) => {
+        if (!current || !snapshot.missionId || !userContext) throw new Error('Mapping context is unavailable.');
+        const before = recorder.getSnapshot().status;
+        await savePlaceDuringPath({ missionId: snapshot.missionId, userId: userContext.userId, marketId: mission?.marketId, pathSessionId: snapshot.sessionId, latitude: current.latitude, longitude: current.longitude }, value);
+        if (recorder.getSnapshot().status !== before) throw new Error('Place capture changed path state.');
+        setCapture(null); Alert.alert('Place saved', 'Place saved locally without changing path state.');
+      }} />
+      <NativeIssueCapture visible={capture === 'issue'} onClose={() => setCapture(null)} onSave={async (value) => {
+        if (!current || !snapshot.missionId || !userContext) throw new Error('Mapping context is unavailable.');
+        const before = recorder.getSnapshot().status;
+        await saveQuickIssue({ missionId: snapshot.missionId, userId: userContext.userId, pathSessionId: snapshot.sessionId, latitude: current.latitude, longitude: current.longitude }, value);
+        if (recorder.getSnapshot().status !== before) throw new Error('Issue capture changed path state.');
+        setCapture(null); Alert.alert('Issue reported', 'Issue saved locally without changing path state.');
       }} />
       <NativeJunctionPicker visible={capture === 'junction'} onClose={() => setCapture(null)} onSave={async (junctionType) => {
         if (!current || !snapshot.missionId || !snapshot.sessionId || !userContext) throw new Error('Active path context is unavailable.');
