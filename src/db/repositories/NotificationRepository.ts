@@ -90,14 +90,17 @@ export class NotificationRepository {
       `UPDATE local_notifications SET is_read = 1 WHERE id = ?;`,
       [id]
     );
+    await OutboxRepository.enqueue('local_notifications', id, 'UPDATE', { id, isRead: true });
     return true;
   }
 
   static async markAllAsRead(recipientId: string): Promise<boolean> {
+    const unread = await this.db.getAllAsync<any>(`SELECT id FROM local_notifications WHERE recipient_id = ? AND is_read = 0;`, [recipientId]);
     await this.db.runAsync(
       `UPDATE local_notifications SET is_read = 1 WHERE recipient_id = ?;`,
       [recipientId]
     );
+    for (const row of unread) await OutboxRepository.enqueue('local_notifications', row.id, 'UPDATE', { id: row.id, isRead: true });
     return true;
   }
 }
