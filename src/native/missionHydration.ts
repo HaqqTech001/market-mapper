@@ -3,7 +3,7 @@ import { MissionRepository } from '@/src/db/repositories/MissionRepository';
 
 export async function hydrateMissionCoordination(missionId:string){
  const [{data:members,error:me},{data:areas,error:ae}]=await Promise.all([
-  nativeSupabase.from('mission_members').select('user_id,role,assigned_at,profiles!mission_members_user_id_fkey(full_name)').eq('mission_id',missionId),
+  nativeSupabase.from('mission_members').select('user_id,role,created_at,profiles!mission_members_user_id_fkey(full_name)').eq('mission_id',missionId),
   nativeSupabase.from('mission_area_assignments').select('area_id,area_name,assigned_to_user_id,status,assigned_at,notes,profiles!mission_area_assignments_assigned_to_user_id_fkey(full_name)').eq('mission_id',missionId)
  ]);
  if(me)throw me;if(ae)throw ae;
