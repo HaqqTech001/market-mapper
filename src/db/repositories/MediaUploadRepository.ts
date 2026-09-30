@@ -98,7 +98,7 @@ export class MediaUploadRepository {
 
   static async countPending(): Promise<number> {
     const rows = await this.db.getAllAsync<any>(
-      `SELECT id FROM local_media_upload_queue WHERE status IN ('pending','failed') AND retry_count < 5;`
+      `SELECT id FROM local_media_upload_queue WHERE status = 'pending' AND retry_count < 5;`
     );
     return rows.length;
   }
