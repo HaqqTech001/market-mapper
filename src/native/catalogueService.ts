@@ -17,3 +17,12 @@ export async function reviewSuggestion(id:string,decision:'approved'|'merged'|'r
  const {error}=await nativeSupabase.from('catalogue_suggestions').update({status:decision,merged_into_id:target,reviewer_notes:notes||null,reviewed_by:u.userId,reviewed_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',id).eq('status','pending');if(error)throw error;
  await hydrateCatalogue();return target;
 }
+
+export async function listCanonicalCatalogueItems(){await admin();const {data,error}=await nativeSupabase.from('catalogue_items').select('id,name,item_type,primary_category_id').eq('is_archived',false).order('name');if(error)throw error;return data||[]}
+export async function mergeSuggestion(id:string,targetId:string,notes?:string){
+ await admin();const {data:s,error:se}=await nativeSupabase.from('catalogue_suggestions').select('name,item_type').eq('id',id).eq('status','pending').single();if(se)throw se;
+ const {data:t,error:te}=await nativeSupabase.from('catalogue_items').select('id,item_type').eq('id',targetId).eq('is_archived',false).single();if(te)throw te;if(t.item_type!==s.item_type)throw new Error('MERGE_TYPE_MISMATCH');
+ const alias=String(s.name||'').trim();if(alias){const {error:ae}=await nativeSupabase.from('catalogue_aliases').upsert({catalogue_item_id:targetId,alias_name:alias},{onConflict:'catalogue_item_id,alias_name'});if(ae)throw ae}
+ return reviewSuggestion(id,'merged',targetId,notes);
+}
+export async function archiveCatalogueItem(id:string){await admin();const {error}=await nativeSupabase.from('catalogue_items').update({is_archived:true,updated_at:new Date().toISOString()}).eq('id',id);if(error)throw error;const db=getDatabase();await db.runAsync("UPDATE local_catalogue_items SET is_archived=1,updated_at=? WHERE id=?",[new Date().toISOString(),id]);}
