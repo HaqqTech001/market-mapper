@@ -2,12 +2,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { NotificationRepository } from '@/src/db/repositories/NotificationRepository';
-import { getAssignedNativeMissions, requireNativeUserContext, type NativeMissionSummary, type NativeUserContext } from '@/src/native/userContext';
+import { getAssignedNativeMissions, requireNativeUserContext, type NativeMissionContext, type NativeUserContext } from '@/src/native/userContext';
 import { subscribeOperationalData } from '@/src/native/operationalEvents';
 import { getNativeSyncSnapshot, type NativeSyncSnapshot } from '@/src/native/syncCoordinator';
 
 export default function HomeScreen(){
- const [user,setUser]=useState<NativeUserContext|null>(null);const [missions,setMissions]=useState<NativeMissionSummary[]>([]);const [unread,setUnread]=useState(0);const [sync,setSync]=useState<NativeSyncSnapshot|null>(null);const [loading,setLoading]=useState(true);
+ const [user,setUser]=useState<NativeUserContext|null>(null);const [missions,setMissions]=useState<NativeMissionContext[]>([]);const [unread,setUnread]=useState(0);const [sync,setSync]=useState<NativeSyncSnapshot|null>(null);const [loading,setLoading]=useState(true);
  const load=useCallback(async()=>{try{const u=user||await requireNativeUserContext();setUser(u);setMissions(await getAssignedNativeMissions(u.userId));setUnread(await NotificationRepository.getUnreadCount(u.userId));setSync(await getNativeSyncSnapshot())}finally{setLoading(false)}},[user]);
  useFocusEffect(useCallback(()=>{load();return subscribeOperationalData(()=>load())},[load]));
  useEffect(()=>{load()},[]);
@@ -16,9 +16,9 @@ export default function HomeScreen(){
  const active=missions.find(m=>['assigned','active','in_progress'].includes(m.status))||missions[0];
  return <SafeAreaView style={s.safe}><ScrollView contentContainerStyle={s.body}>
   <View style={s.top}><View><Text style={s.eyebrow}>MARKET MAPPER</Text><Text style={s.greeting}>Hello, {user.fullName.split(' ')[0]}</Text><Text style={s.role}>{user.role.replace('_',' ')}</Text></View><Pressable style={s.bell} onPress={()=>router.push('/notifications')}><Text style={s.bellText}>Bell</Text>{unread?<View style={s.badge}><Text style={s.badgeText}>{unread>99?'99+':unread}</Text></View>:null}</Pressable></View>
-  {active?<View style={s.hero}><Text style={s.heroEyebrow}>ACTIVE MISSION</Text><Text style={s.heroTitle}>{active.title}</Text><Text style={s.heroMeta}>{active.marketName||'Assigned market'} · {active.status.replace('_',' ')}</Text><Pressable style={s.primary} onPress={()=>router.push({pathname:'/map',params:{missionId:active.id}})}><Text style={s.primaryText}>Continue Mapping</Text></Pressable></View>:<View style={s.empty}><Text style={s.emptyTitle}>No Active Mission</Text><Text style={s.help}>You can still view Missions, Chat, Revisits and Offline Data.</Text></View>}
+  {active?<View style={s.hero}><Text style={s.heroEyebrow}>ACTIVE MISSION</Text><Text style={s.heroTitle}>{active.title}</Text><Text style={s.heroMeta}>{active.status.replace('_',' ')}</Text><Pressable style={s.primary} onPress={()=>router.push({pathname:'/map',params:{missionId:active.id}})}><Text style={s.primaryText}>Continue Mapping</Text></Pressable></View>:<View style={s.empty}><Text style={s.emptyTitle}>No Active Mission</Text><Text style={s.help}>You can still view Missions, Chat, Revisits and Offline Data.</Text></View>}
   <Text style={s.section}>FIELD WORK</Text><View style={s.grid}><Tile title="Missions" sub={missions.length+' assigned'} onPress={()=>router.push('/missions')}/><Tile title="Map" sub="Field workspace" onPress={()=>active?router.push({pathname:'/map',params:{missionId:active.id}}):router.push('/missions')}/><Tile title="Chat" sub="Mission teams" onPress={()=>router.push('/chat')}/><Tile title="Offline Data" sub={sync?.state==='synced'?'Synced':(sync?.relationalPending||0)+(sync?.mediaPending||0)+' pending'} onPress={()=>router.push('/offline-data')}/></View>
-  {user.role!=='mapper'?<><Text style={s.section}>{user.role==='admin'?'OPERATIONS':'TEAM COORDINATION'}</Text><View style={s.grid}><Tile title={user.role==='admin'?'Admin Workspace':'Assignments'} sub={user.role==='admin'?'Users · teams · catalogue':'Team field work'} onPress={()=>router.push('/more')}/><Tile title="Field Issues" sub="Review operational issues" onPress={()=>router.push('/more')}/></View></>:null}
+  {user.role!=='mapper'?<><Text style={s.section}>{user.role==='admin'?'OPERATIONS':'TEAM COORDINATION'}</Text><View style={s.grid}><Tile title={user.role==='admin'?'Admin Workspace':'Assignments'} sub={user.role==='admin'?'Users · teams · catalogue':'Team field work'} onPress={()=>router.push(user.role==='admin'?'/admin-workspace':'/team-coordination')}/><Tile title="Field Issues" sub="Review operational issues" onPress={()=>router.push('/field-issues')}/></View></>:null}
  </ScrollView></SafeAreaView>
 }
 function Tile({title,sub,onPress}:{title:string;sub:string;onPress:()=>void}){return <Pressable style={s.tile} onPress={onPress}><Text style={s.tileTitle}>{title}</Text><Text style={s.help}>{sub}</Text></Pressable>}
