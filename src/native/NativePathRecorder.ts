@@ -137,6 +137,26 @@ export class NativePathRecorder {
   }
 
 
+
+  async getReviewTargets() {
+    if (!this.snapshot.sessionId) return { points: [], junctions: [] };
+    const recovered = await PathRepository.getSessionById(this.snapshot.sessionId);
+    if (!recovered) return { points: [], junctions: [] };
+    return { points: recovered.points.filter(p=>p.accepted), junctions: recovered.junctions.filter(j=>!j.isExcluded) };
+  }
+
+  async restartFromPoint(pointId: string) {
+    if (this.snapshot.status !== 'reviewing' || !this.snapshot.sessionId) throw new Error('Path must be in review before correcting it.');
+    await PathRepository.applySelectPreviousPoint(this.snapshot.sessionId, pointId);
+    await this.reloadReviewGeometry();
+  }
+
+  async restartFromJunction(junctionId: string) {
+    if (this.snapshot.status !== 'reviewing' || !this.snapshot.sessionId) throw new Error('Path must be in review before correcting it.');
+    await PathRepository.applyRestartFromJunction(this.snapshot.sessionId, junctionId);
+    await this.reloadReviewGeometry();
+  }
+
   async undoDistance(meters: number) {
     if (this.snapshot.status !== 'reviewing' || !this.snapshot.sessionId) throw new Error('Path must be in review before correcting it.');
     await PathRepository.applyUndoDistance(this.snapshot.sessionId, meters);
