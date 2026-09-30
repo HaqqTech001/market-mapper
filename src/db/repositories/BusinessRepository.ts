@@ -16,7 +16,7 @@ import {
 import { calculateHaversineDistanceMeters } from '../../lib/location/gpsQuality';
 
 export class BusinessRepository {
-  private static db = getDatabase();
+  private static get db() { return getDatabase(); }
 
   /**
    * Generates a stable, human-friendly local operational label such as B-M01-001, B-A12-001 or B001...
