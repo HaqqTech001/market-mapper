@@ -1,7 +1,7 @@
 import { BusinessRepository } from '@/src/db/repositories/BusinessRepository';
 import { FieldIssueRepository } from '@/src/db/repositories/FieldIssueRepository';
 import { PathRepository } from '@/src/db/repositories/PathRepository';
-import type { Business, BusinessActivity, BusinessStability, BusinessType, JunctionType, RelativeBusinessPosition } from '@/src/types';
+import type { Business, BusinessActivity, BusinessOfferingObservation, BusinessStability, BusinessType, CatalogueItemType, JunctionType, RelativeBusinessPosition } from '@/src/types';
 
 export type FieldCaptureContext = {
   missionId: string;
@@ -17,7 +17,7 @@ export type FieldCaptureContext = {
 
 export async function saveQuickBusiness(
   context: FieldCaptureContext,
-  input: { name?: string; noVisibleName?: boolean; businessType: BusinessType; activity: BusinessActivity; stability?: BusinessStability; relativePosition?: RelativeBusinessPosition; notes?: string },
+  input: { name?: string; noVisibleName?: boolean; businessType: BusinessType; activity: BusinessActivity; stability?: BusinessStability; relativePosition?: RelativeBusinessPosition; notes?: string; shopNumber?: string; sectionName?: string; lineName?: string; primaryCategoryId?: string; offerings?: { catalogueItemId?: string; pendingSuggestionId?: string; name: string; itemType: CatalogueItemType; howEstablished: BusinessOfferingObservation }[] },
 ): Promise<Business> {
   const now = new Date().toISOString();
   const id = `biz_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -43,6 +43,10 @@ export async function saveQuickBusiness(
     headingSource: context.heading == null ? 'none' : 'compass',
     directionConfidence: context.heading == null ? 'none' : 'medium',
     parentPathSessionId: context.pathSessionId ?? undefined,
+    shopNumber: input.shopNumber,
+    sectionName: input.sectionName,
+    lineName: input.lineName,
+    primaryCategoryId: input.primaryCategoryId,
     stability: input.stability ?? 'unknown',
     photoDeclined: false,
     photoState: 'not_captured',
@@ -58,7 +62,13 @@ export async function saveQuickBusiness(
     isDeleted: false,
     syncStatus: 'local_only',
   };
-  return BusinessRepository.create(business);
+  return BusinessRepository.create(business, (input.offerings ?? []).map((o) => ({
+    catalogueItemId: o.catalogueItemId,
+    pendingSuggestionId: o.pendingSuggestionId,
+    catalogueItemName: o.name,
+    itemType: o.itemType,
+    howEstablished: o.howEstablished,
+  })));
 }
 
 export async function saveQuickJunction(
