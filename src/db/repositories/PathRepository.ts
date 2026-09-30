@@ -196,7 +196,7 @@ export class PathRepository {
     junctions: LocalPathJunction[];
   }> {
     const row = await this.db.getFirstAsync<any>(
-      `SELECT * FROM local_path_sessions WHERE status IN ('recording', 'paused') ORDER BY last_saved_at DESC LIMIT 1;`
+      `SELECT * FROM local_path_sessions WHERE status IN ('recording', 'paused', 'reviewing') ORDER BY last_saved_at DESC LIMIT 1;`
     );
     if (!row) {
       return { session: null, segments: [], points: [], junctions: [] };
@@ -1041,6 +1041,33 @@ export class PathRepository {
         branches,
       };
     });
+  }
+
+
+  static async getRemainingJunctionBranches(missionId?: string): Promise<Array<{ junction: LocalPathJunction; branch: JunctionBranch }>> {
+    const junctions = await this.getAllSavedJunctions();
+    const rows: Array<{ junction: LocalPathJunction; branch: JunctionBranch }> = [];
+    for (const junction of junctions) {
+      if (missionId && junction.missionId !== missionId) continue;
+      for (const branch of junction.branches ?? []) {
+        if (branch.status === 'unmapped' || branch.status === 'in_progress') rows.push({ junction, branch });
+      }
+    }
+    return rows;
+  }
+
+  static async markBranchInProgress(branchId: string, mappedBy: string): Promise<void> {
+    await this.db.runAsync(
+      `UPDATE local_junction_branches SET status = 'in_progress', mapped_by = ? WHERE id = ? AND status IN ('unmapped', 'in_progress');`,
+      [mappedBy, branchId]
+    );
+  }
+
+  static async markBranchMapped(branchId: string, connectedPathId: string, mappedBy: string, connectedTargetJunctionId?: string): Promise<void> {
+    await this.db.runAsync(
+      `UPDATE local_junction_branches SET status = 'mapped', connected_path_id = ?, connected_target_junction_id = ?, mapped_at = ?, mapped_by = ? WHERE id = ?;`,
+      [connectedPathId, connectedTargetJunctionId || null, new Date().toISOString(), mappedBy, branchId]
+    );
   }
 
   /**
