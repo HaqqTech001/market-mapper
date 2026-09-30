@@ -75,6 +75,13 @@ export class RevisitRepository {
     }));
   }
 
+  static async resolve(id: string, resolvedBy: string, resolutionNotes?: string): Promise<boolean> {
+    const now = new Date().toISOString();
+    await this.db.runAsync("UPDATE local_revisits SET status='resolved', resolved_by=?, resolution_notes=?, resolved_at=?, updated_at=? WHERE id=?;", [resolvedBy, resolutionNotes || null, now, now, id]);
+    await OutboxRepository.enqueue('local_revisits', id, 'UPDATE', { status:'resolved', resolvedBy, resolutionNotes:resolutionNotes || null, resolvedAt:now, updatedAt:now });
+    return true;
+  }
+
   static async countOpen(): Promise<number> {
     const rows = await this.db.getAllAsync<any>(
       `SELECT id FROM local_revisits WHERE status = 'open';`
