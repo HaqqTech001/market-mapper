@@ -68,7 +68,7 @@ export class MediaUploadRepository {
    */
   static async getPending(): Promise<MediaUploadQueueItem[]> {
     const rows = await this.db.getAllAsync<any>(
-      `SELECT * FROM local_media_upload_queue WHERE status IN ('pending', 'failed') ORDER BY created_at ASC;`
+      `SELECT * FROM local_media_upload_queue WHERE status IN ('pending', 'failed') AND retry_count < 5 ORDER BY created_at ASC;`
     );
     return rows.map((r) => ({
       id: r.id,
@@ -86,9 +86,19 @@ export class MediaUploadRepository {
     }));
   }
 
+  static async markUploaded(id: string): Promise<void> {
+    const now = new Date().toISOString();
+    await this.db.runAsync(`UPDATE local_media_upload_queue SET status = 'uploaded', error_message = NULL, updated_at = ? WHERE id = ?;`, [now, id]);
+  }
+
+  static async retryFailed(id?: string): Promise<void> {
+    if (id) await this.db.runAsync(`UPDATE local_media_upload_queue SET status = 'pending', error_message = NULL WHERE id = ? AND status = 'failed' AND retry_count < 5;`, [id]);
+    else await this.db.runAsync(`UPDATE local_media_upload_queue SET status = 'pending', error_message = NULL WHERE status = 'failed' AND retry_count < 5;`);
+  }
+
   static async countPending(): Promise<number> {
     const rows = await this.db.getAllAsync<any>(
-      `SELECT id FROM local_media_upload_queue WHERE status = 'pending';`
+      `SELECT id FROM local_media_upload_queue WHERE status IN ('pending','failed') AND retry_count < 5;`
     );
     return rows.length;
   }
