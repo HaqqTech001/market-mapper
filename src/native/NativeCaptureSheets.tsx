@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { CatalogueRepository, type SearchableOfferItem } from '@/src/db/repositories/CatalogueRepository';
-import type { BusinessActivity, BusinessStability, BusinessType, JunctionType, RelativeBusinessPosition } from '@/src/types';
+import type { BusinessActivity, BusinessStability, BusinessType, FieldIssueType, JunctionType, PlaceType, RelativeBusinessPosition } from '@/src/types';
 
 export type BusinessCaptureValue = {
   name?: string; noVisibleName?: boolean; businessType: BusinessType; activity: BusinessActivity;
@@ -38,6 +38,31 @@ export function NativeBusinessCapture({ visible, onClose, onSave }: { visible: b
     </ScrollView>
     <View style={s.footer}>{step>1?<Pressable style={s.secondary} onPress={()=>setStep(x=>x-1)}><Text style={s.secondaryText}>Back</Text></Pressable>:null}{step<4?<Pressable style={s.primary} onPress={()=>setStep(x=>x+1)}><Text style={s.primaryText}>Continue</Text></Pressable>:<Pressable disabled={busy} style={s.primary} onPress={async()=>{setBusy(true);try{await onSave({name:name.trim()||undefined,noVisibleName:!name.trim(),businessType,activity,stability,relativePosition,shopNumber:shopNumber||undefined,sectionName:sectionName||undefined,lineName:lineName||undefined,offerings:selected.map(o=>({catalogueItemId:o.isPendingSuggestion?undefined:o.id,pendingSuggestionId:o.isPendingSuggestion?o.id:undefined,name:o.name,itemType:o.itemType,howEstablished:'observed'}))});reset();}finally{setBusy(false)}}}><Text style={s.primaryText}>{busy?'Saving…':'Save Business'}</Text></Pressable>}</View>
   </View></Modal>;
+}
+
+
+const placeTypes: { value: PlaceType; label: string }[] = [
+  { value:'gate_entrance', label:'Gate / Entrance' }, { value:'landmark', label:'Landmark' },
+  { value:'facility_restroom', label:'Restroom' }, { value:'facility_water', label:'Water Point' },
+  { value:'facility_waste', label:'Waste Point' }, { value:'facility_power', label:'Power Facility' },
+  { value:'transport_stop', label:'Transport Point' }, { value:'other', label:'Other Place' },
+];
+const issueTypes: { value: FieldIssueType; label: string }[] = [
+  { value:'access_blocked', label:'Blocked Passage' }, { value:'unsafe_area', label:'Unsafe Area' },
+  { value:'hazard_obstacle', label:'Hazard / Obstacle' }, { value:'disputed_boundary', label:'Area Not Clear' },
+  { value:'wrong_assignment', label:'Wrong Assignment' }, { value:'severe_weather', label:'Severe Weather' },
+  { value:'other', label:'Other' },
+];
+
+export function NativePlaceCapture({ visible, onClose, onSave }: { visible:boolean; onClose:()=>void; onSave:(v:{placeType:PlaceType;displayName?:string;description?:string})=>Promise<void> }) {
+ const [type,setType]=useState<PlaceType>('gate_entrance'); const [name,setName]=useState(''); const [note,setNote]=useState(''); const [busy,setBusy]=useState(false);
+ return <Modal visible={visible} animationType="slide" onRequestClose={onClose}><View style={s.page}><View style={s.header}><View><Text style={s.eyebrow}>ADD PLACE</Text><Text style={s.title}>What is here?</Text></View><Pressable onPress={onClose} style={s.close}><Text style={s.closeText}>×</Text></Pressable></View><ScrollView contentContainerStyle={s.body}><View style={s.grid}>{placeTypes.map(p=><Choice key={p.value} label={p.label} selected={type===p.value} onPress={()=>setType(p.value)}/>)}</View><Field label="Local name / reference (optional)" value={name} onChangeText={setName}/><Field label="Note (optional)" value={note} onChangeText={setNote}/><Text style={s.help}>The current GPS position is captured independently from the active path point.</Text></ScrollView><View style={s.footer}><Pressable style={s.secondary} onPress={onClose}><Text style={s.secondaryText}>Cancel</Text></Pressable><Pressable disabled={busy} style={s.primary} onPress={async()=>{setBusy(true);try{await onSave({placeType:type,displayName:name.trim()||undefined,description:note.trim()||undefined});setName('');setNote('');}finally{setBusy(false)}}}><Text style={s.primaryText}>{busy?'Saving…':'Save Place'}</Text></Pressable></View></View></Modal>
+}
+
+export function NativeIssueCapture({ visible, onClose, onSave }: { visible:boolean; onClose:()=>void; onSave:(v:{issueType:FieldIssueType;title:string;description:string})=>Promise<void> }) {
+ const [type,setType]=useState<FieldIssueType>('access_blocked'); const [note,setNote]=useState(''); const [busy,setBusy]=useState(false);
+ const label=issueTypes.find(x=>x.value===type)?.label||'Field Issue';
+ return <Modal visible={visible} animationType="slide" onRequestClose={onClose}><View style={s.page}><View style={s.header}><View><Text style={s.eyebrow}>REPORT ISSUE</Text><Text style={s.title}>Keep the team informed</Text></View><Pressable onPress={onClose} style={s.close}><Text style={s.closeText}>×</Text></Pressable></View><ScrollView contentContainerStyle={s.body}><View style={s.grid}>{issueTypes.map(p=><Choice key={p.value} label={p.label} selected={type===p.value} onPress={()=>setType(p.value)}/>)}</View><Field label="What should the team know?" value={note} onChangeText={setNote}/>{type==='unsafe_area'?<Text style={s.warning}>Do not enter an unsafe area to complete mapping. Report it and continue only where it is safe.</Text>:null}</ScrollView><View style={s.footer}><Pressable style={s.secondary} onPress={onClose}><Text style={s.secondaryText}>Cancel</Text></Pressable><Pressable disabled={busy} style={s.primary} onPress={async()=>{setBusy(true);try{await onSave({issueType:type,title:label,description:note.trim()||label});setNote('');}finally{setBusy(false)}}}><Text style={s.primaryText}>{busy?'Saving…':'Report Issue'}</Text></Pressable></View></View></Modal>
 }
 
 export function NativeJunctionPicker({ visible, onClose, onSave }: { visible:boolean; onClose:()=>void; onSave:(type:JunctionType)=>Promise<void> }) {
