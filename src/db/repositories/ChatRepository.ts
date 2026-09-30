@@ -56,6 +56,7 @@ export class ChatRepository {
       [id, name, channelType, teamId || null, missionId || null, now]
     );
 
+    await OutboxRepository.enqueue('local_chat_channels', id, 'INSERT', newChannel as unknown as Record<string, unknown>);
     return newChannel;
   }
 
@@ -205,6 +206,7 @@ export class ChatRepository {
       `UPDATE local_chat_messages SET is_pinned = ? WHERE id = ?;`,
       [isPinned ? 1 : 0, messageId]
     );
+    await OutboxRepository.enqueue('local_chat_messages', messageId, 'UPDATE', { id: messageId, isPinned });
     return true;
   }
 
