@@ -136,6 +136,7 @@ export class HandoverRepository {
       [newStatus, now, id]
     );
 
+    let cloudConfirmed = false;
     if (newStatus === 'accepted') {
       // Prefer authoritative atomic cloud transfer. If offline/unreachable, retain the local
       // acceptance as pending sync; the server will still reject it as stale if assignment changed.
@@ -146,6 +147,7 @@ export class HandoverRepository {
           await this.db.runAsync(`UPDATE local_handovers SET status='stale', updated_at=? WHERE id=?;`, [now, id]);
           return false;
         }
+        cloudConfirmed = true;
       } catch (error) {
         console.warn('Handover cloud acceptance deferred; local state remains pending sync', error);
       }
@@ -187,10 +189,16 @@ export class HandoverRepository {
       );
     }
 
-    await OutboxRepository.enqueue('local_handovers', id, 'UPDATE', {
-      status: newStatus,
-      updated_at: now,
-    });
+    if (newStatus === 'accepted' && cloudConfirmed) {
+      await this.db.runAsync("UPDATE local_handovers SET sync_status='synced' WHERE id=?;", [id]);
+    } else {
+      await this.db.runAsync("UPDATE local_handovers SET sync_status='pending' WHERE id=?;", [id]);
+      await OutboxRepository.enqueue('local_handovers', id, 'UPDATE', {
+        status: newStatus,
+        updated_at: now,
+        authoritativeAccept: newStatus === 'accepted',
+      });
+    }
 
     return true;
   }
