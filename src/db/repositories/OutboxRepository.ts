@@ -71,8 +71,29 @@ export class OutboxRepository {
     );
   }
 
-  static async markConflict(id: string, errorMessage: string): Promise<void> {
-    await this.db.runAsync(`UPDATE local_outbox_queue SET status = 'conflict', error_message = ? WHERE id = ?;`, [errorMessage, id]);
+  static async markConflict(id: string, errorMessage: string, serverPayload: Record<string, unknown> = {}, serverVersion = 0): Promise<void> {
+    const item = (await this.getQueue()).find((x) => x.id === id);
+    if (!item) return;
+    const local = JSON.parse(item.payload || '{}') as Record<string, unknown>;
+    const localVersion = Number(local.version || 1);
+    const conflictId = 'conf_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    const now = new Date().toISOString();
+    await this.db.runAsync('UPDATE local_outbox_queue SET status = \'conflict\', error_message = ? WHERE id = ?;', [errorMessage, id]);
+    await this.db.runAsync(
+      'INSERT INTO local_sync_conflicts (id, table_name, record_id, local_version, server_version, local_payload, server_payload, conflict_detected_at, resolution_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, \'unresolved\');',
+      [conflictId, item.tableName, item.recordId, localVersion, serverVersion, item.payload, JSON.stringify(serverPayload), now]
+    );
+  }
+
+  static async getConflicts(): Promise<any[]> {
+    return this.db.getAllAsync<any>("SELECT * FROM local_sync_conflicts WHERE resolution_status = 'unresolved' ORDER BY conflict_detected_at DESC;");
+  }
+
+  static async resolveConflict(conflictId: string, retryLocal = false): Promise<void> {
+    const conflict = await this.db.getFirstAsync<any>('SELECT * FROM local_sync_conflicts WHERE id = ?;', [conflictId]);
+    if (!conflict) return;
+    await this.db.runAsync("UPDATE local_sync_conflicts SET resolution_status = 'resolved' WHERE id = ?;", [conflictId]);
+    if (retryLocal) await this.db.runAsync("UPDATE local_outbox_queue SET status = 'pending', error_message = NULL WHERE table_name = ? AND record_id = ? AND status = 'conflict';", [conflict.table_name, conflict.record_id]);
   }
 
   static async retryFailed(id?: string): Promise<void> {
