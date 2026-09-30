@@ -1,0 +1,16 @@
+-- Catalogue reference data and mapper suggestion review
+CREATE TABLE IF NOT EXISTS public.catalogue_categories(id text PRIMARY KEY,name text NOT NULL,icon_name text,sort_order int NOT NULL DEFAULT 0,is_archived boolean NOT NULL DEFAULT false,created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS public.catalogue_items(id text PRIMARY KEY,name text NOT NULL,item_type text NOT NULL CHECK(item_type IN ('product','service')),primary_category_id text REFERENCES public.catalogue_categories(id),is_archived boolean NOT NULL DEFAULT false,created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS public.catalogue_aliases(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),catalogue_item_id text NOT NULL REFERENCES public.catalogue_items(id) ON DELETE CASCADE,alias_name text NOT NULL,UNIQUE(catalogue_item_id,alias_name));
+CREATE TABLE IF NOT EXISTS public.catalogue_suggestions(id text PRIMARY KEY,suggested_by uuid NOT NULL REFERENCES public.profiles(id),name text NOT NULL,item_type text NOT NULL CHECK(item_type IN ('product','service')),suggested_category_id text REFERENCES public.catalogue_categories(id),market_id uuid,notes text,status text NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','merged','rejected')),merged_into_id text REFERENCES public.catalogue_items(id),reviewer_notes text,reviewed_by uuid REFERENCES public.profiles(id),reviewed_at timestamptz,created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now());
+CREATE INDEX IF NOT EXISTS idx_catalogue_suggestions_status ON public.catalogue_suggestions(status);
+ALTER TABLE public.catalogue_categories ENABLE ROW LEVEL SECURITY; ALTER TABLE public.catalogue_items ENABLE ROW LEVEL SECURITY; ALTER TABLE public.catalogue_aliases ENABLE ROW LEVEL SECURITY; ALTER TABLE public.catalogue_suggestions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Active users read catalogue categories" ON public.catalogue_categories FOR SELECT USING(public.current_user_is_active());
+CREATE POLICY "Admins manage catalogue categories" ON public.catalogue_categories FOR ALL USING(public.is_admin()) WITH CHECK(public.is_admin());
+CREATE POLICY "Active users read catalogue items" ON public.catalogue_items FOR SELECT USING(public.current_user_is_active());
+CREATE POLICY "Admins manage catalogue items" ON public.catalogue_items FOR ALL USING(public.is_admin()) WITH CHECK(public.is_admin());
+CREATE POLICY "Active users read catalogue aliases" ON public.catalogue_aliases FOR SELECT USING(public.current_user_is_active());
+CREATE POLICY "Admins manage catalogue aliases" ON public.catalogue_aliases FOR ALL USING(public.is_admin()) WITH CHECK(public.is_admin());
+CREATE POLICY "Users submit own catalogue suggestions" ON public.catalogue_suggestions FOR INSERT WITH CHECK(public.current_user_is_active() AND suggested_by=auth.uid() AND status='pending' AND reviewed_by IS NULL);
+CREATE POLICY "Users read own suggestions admins read all" ON public.catalogue_suggestions FOR SELECT USING((suggested_by=auth.uid() AND public.current_user_is_active()) OR public.is_admin());
+CREATE POLICY "Admins review catalogue suggestions" ON public.catalogue_suggestions FOR UPDATE USING(public.is_admin()) WITH CHECK(public.is_admin());
