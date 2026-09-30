@@ -27,6 +27,14 @@ function mapNotification(p:Payload){return {id:p.id,recipient_id:p.recipientId,t
 
 async function apply(item:OutboxQueueItem){
  const p:Payload=JSON.parse(item.payload);
+ if(item.tableName==='local_notifications' && item.action==='INSERT'){
+   if(p.entityReferenceType==='handover'){
+     const {error}=await nativeSupabase.rpc('create_mission_notification',{target_user_id:p.recipientId,notification_id:p.id,notification_type:p.type,notification_title:p.title,notification_body:p.body,reference_type:'handover',reference_id:p.entityReferenceId});if(error)throw error;return;
+   }
+   const user=(await nativeSupabase.auth.getUser()).data.user;
+   const {data:profile}=user?await nativeSupabase.from('profiles').select('role').eq('id',user.id).single():{data:null};
+   if(profile?.role!=='admin')throw new Error('NOTIFICATION_INSERT_REQUIRES_PRIVILEGED_FLOW');
+ }
  if(item.tableName==='businesses'){
    const offerings=p.offerings||[]; const business=mapBusiness(p);
    const {error}=await nativeSupabase.from('businesses').upsert(business,{onConflict:'id'}); if(error)throw error;
