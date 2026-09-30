@@ -9,6 +9,7 @@ import { savePlaceDuringPath, saveQuickBusiness, saveQuickJunction, saveQuickIss
 import { getAssignedNativeMissions, requireNativeUserContext, type NativeMissionContext, type NativeUserContext } from '@/src/native/userContext';
 import { NativeBusinessCapture, NativeIssueCapture, NativeJunctionPicker, NativePlaceCapture, type BusinessCaptureValue } from '@/src/native/NativeCaptureSheets';
 import { RemainingBranchesSheet } from '@/src/native/RemainingBranchesSheet';
+import { PathRepository } from '@/src/db/repositories/PathRepository';
 
 const recorder = new NativePathRecorder();
 
@@ -22,7 +23,7 @@ export default function MapScreen() {
   const [contextError, setContextError] = useState<string | null>(null);
   const [capture, setCapture] = useState<'business' | 'junction' | 'place' | 'issue' | null>(null);
   const [showBranches, setShowBranches] = useState(false);
-  const [branchTarget, setBranchTarget] = useState<{ label: string; latitude: number; longitude: number } | null>(null);
+  const [branchTarget, setBranchTarget] = useState<{ branchId: string; label: string; latitude: number; longitude: number } | null>(null);
   const subscription = useRef<LocationSubscription | null>(null);
 
   const path = snapshot.acceptedPoints.map((p) => ({ latitude: p.latitude, longitude: p.longitude }));
@@ -107,7 +108,11 @@ export default function MapScreen() {
           setBusy(true);
           try {
             if (!userContext) throw new Error('Authenticated user is required.');
-            await recorder.save(userContext.userId);
+            const savedPath = await recorder.save(userContext.userId);
+            if (branchTarget) {
+              await PathRepository.markBranchMapped(branchTarget.branchId, savedPath.id, userContext.userId);
+              setBranchTarget(null);
+            }
             setSnapshot(recorder.getSnapshot());
           } catch (error) {
             Alert.alert('Could not save path', error instanceof Error ? error.message : 'Please try again.');
@@ -157,7 +162,7 @@ export default function MapScreen() {
           </>
         )}
       </View>
-      {mission && userContext ? <RemainingBranchesSheet visible={showBranches} missionId={mission.id} userId={userContext.userId} onClose={() => setShowBranches(false)} onSelect={({junction}) => setBranchTarget({ label: junction.operationalLabel, latitude: junction.latitude, longitude: junction.longitude })} /> : null}
+      {mission && userContext ? <RemainingBranchesSheet visible={showBranches} missionId={mission.id} userId={userContext.userId} onClose={() => setShowBranches(false)} onSelect={({junction, branch}) => setBranchTarget({ branchId: branch.id, label: `${junction.operationalLabel} · ${branch.label}`, latitude: junction.latitude, longitude: junction.longitude })} /> : null}
       <NativeBusinessCapture visible={capture === 'business'} onClose={() => setCapture(null)} onSave={async (value: BusinessCaptureValue) => {
         if (!current || !snapshot.missionId || !userContext) throw new Error('Mapping context is unavailable.');
         const before = recorder.getSnapshot().status;
