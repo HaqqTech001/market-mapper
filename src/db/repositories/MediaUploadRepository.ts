@@ -7,7 +7,7 @@ import { getDatabase } from '../sqlite';
 import { MediaUploadQueueItem, MediaUploadStatus } from '../../types';
 
 export class MediaUploadRepository {
-  private static db = getDatabase();
+  private static get db() { return getDatabase(); }
 
   /**
    * Enqueues a locally staged field photo for upload
