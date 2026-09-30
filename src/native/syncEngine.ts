@@ -16,6 +16,13 @@ function mapJunction(p:Payload){return {id:p.id,mission_id:p.missionId||null,pat
 function mapBranch(p:Payload){return {id:p.id,junction_id:p.junctionId,label:p.label,relative_side:p.relativeSide||null,status:p.status||'unmapped',connected_path_id:p.connectedPathId||null,connected_target_junction_id:p.connectedTargetJunctionId||null,notes:p.notes||null,mapped_at:p.mappedAt||null,mapped_by:p.mappedBy||null,created_at:p.createdAt};}
 function mapPlace(p:Payload){return {id:p.id,market_id:p.marketId,mission_id:p.missionId||null,area_id:p.areaId||null,operational_label:p.operationalLabel,display_name:p.displayName||null,place_type:p.placeType,location:point(p.latitude,p.longitude),description:p.description||null,created_by:p.createdBy||null,created_at:p.createdAt,updated_at:p.updatedAt};}
 
+
+function mapRevisit(p:Payload){return {id:p.id,mission_id:p.missionId,entity_type:p.entityType,entity_id:p.entityId,entity_title:p.entityTitle||null,reason:p.reason,notes:p.notes||null,status:p.status||'open',assigned_to:p.assignedTo||null,flagged_by:p.flaggedBy,resolved_by:p.resolvedBy||null,resolution_notes:p.resolutionNotes||null,resolved_at:p.resolvedAt||null,created_at:p.createdAt,updated_at:p.updatedAt};}
+function mapHandover(p:Payload){return {id:p.id,mission_id:p.missionId,mission_title:p.missionTitle||null,area_id:p.areaId,area_name:p.areaName||null,from_user_id:p.fromUserId,from_user_name:p.fromUserName||null,to_user_id:p.toUserId,to_user_name:p.toUserName||null,status:p.status||'pending',notes:p.notes||null,checklist:p.checklist||{},stalls_count_at_handover:p.stallsCountAtHandover||0,paths_count_at_handover:p.pathsCountAtHandover||0,created_at:p.createdAt,updated_at:p.updatedAt};}
+function mapReconciliation(p:Payload){return {id:p.id,mission_id:p.missionId,mission_title:p.missionTitle||null,area_id:p.areaId,area_name:p.areaName,reconciled_by:p.reconciledBy,reconciled_by_name:p.reconciledByName||null,stalls_counted:p.stallsCounted||0,paths_recorded:p.pathsRecorded||0,unresolved_issues_count:p.unresolvedIssuesCount||0,status:p.status||'pending_lead_review',review_notes:p.reviewNotes||null,reviewed_by:p.reviewedBy||null,reviewed_at:p.reviewedAt||null,created_at:p.createdAt,updated_at:p.updatedAt};}
+function mapChatMessage(p:Payload){return {id:p.id,channel_id:p.channelId,sender_id:p.senderId,sender_name:p.senderName,sender_avatar:p.senderAvatar||null,sender_role:p.senderRole,reply_to_id:p.replyToId||null,text:p.text,is_pinned:!!p.isPinned,linked_business_id:p.linkedBusinessId||null,linked_business_name:p.linkedBusinessName||null,linked_path_id:p.linkedPathId||null,linked_path_name:p.linkedPathName||null,linked_issue_id:p.linkedIssueId||null,linked_issue_title:p.linkedIssueTitle||null,shared_location:p.sharedLocation||null,created_at:p.createdAt};}
+function mapNotification(p:Payload){return {id:p.id,recipient_id:p.recipientId,type:p.type,title:p.title,body:p.body,entity_reference_type:p.entityReferenceType||null,entity_reference_id:p.entityReferenceId||null,is_read:!!p.isRead,created_at:p.createdAt};}
+
 async function apply(item:OutboxQueueItem){
  const p:Payload=JSON.parse(item.payload);
  if(item.tableName==='businesses'){
@@ -24,7 +31,7 @@ async function apply(item:OutboxQueueItem){
    if(offerings.length){const rows=offerings.map((o:any)=>({id:o.id,business_id:p.id,catalogue_item_id:o.catalogueItemId||null,pending_suggestion_id:o.pendingSuggestionId||null,item_type:o.itemType||'product',item_name:o.catalogueItemName||null,how_established:o.howEstablished||'observed',created_at:o.createdAt}));const {error:e}=await nativeSupabase.from('business_offerings').upsert(rows,{onConflict:'id'});if(e)throw e;}
    return;
  }
- const config:Record<string,{table:string,map:(p:Payload)=>Payload}>={market_paths:{table:'market_paths',map:mapPath},path_junctions:{table:'path_junctions',map:mapJunction},junction_branches:{table:'junction_branches',map:mapBranch},local_field_issues:{table:'field_issues',map:mapIssue},local_market_places:{table:'market_places',map:mapPlace}};
+ const config:Record<string,{table:string,map:(p:Payload)=>Payload}>={market_paths:{table:'market_paths',map:mapPath},path_junctions:{table:'path_junctions',map:mapJunction},junction_branches:{table:'junction_branches',map:mapBranch},local_field_issues:{table:'field_issues',map:mapIssue},local_market_places:{table:'market_places',map:mapPlace},local_revisits:{table:'revisits',map:mapRevisit},local_handovers:{table:'handovers',map:mapHandover},local_area_reconciliations:{table:'area_reconciliations',map:mapReconciliation},local_chat_messages:{table:'chat_messages',map:mapChatMessage},local_notifications:{table:'notifications',map:mapNotification}};
  const target=config[item.tableName]; if(!target)throw new Error(`SYNC_UNSUPPORTED_TABLE:${item.tableName}`);
  let mapped:Payload;
  if(item.tableName==='junction_branches' && item.action==='UPDATE'){
@@ -54,7 +61,7 @@ export async function syncPendingOutbox(limit=50){
  return {attempted:pending.length,synced,failed,remaining:await OutboxRepository.countPending()};
 }
 async function markLocalSynced(tableName:string,id:string){
- const db=getDatabase(); const local:Record<string,string>={businesses:'local_businesses',market_paths:'local_paths',local_field_issues:'local_field_issues',local_market_places:'local_market_places'};
+ const db=getDatabase(); const local:Record<string,string>={businesses:'local_businesses',market_paths:'local_paths',local_field_issues:'local_field_issues',local_market_places:'local_market_places',local_revisits:'local_revisits',local_handovers:'local_handovers',local_area_reconciliations:'local_area_reconciliations',local_chat_messages:'local_chat_messages',local_notifications:'local_notifications'};
  const table=local[tableName]; if(!table)return;
  await db.runAsync(`UPDATE ${table} SET sync_status = 'synced' WHERE id = ?;`,[id]).catch(()=>{});
 }
