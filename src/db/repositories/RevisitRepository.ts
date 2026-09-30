@@ -5,6 +5,7 @@
 
 import { getDatabase } from '../sqlite';
 import { Revisit, RevisitReason, RevisitEntityType } from '../../types';
+import { OutboxRepository } from './OutboxRepository';
 
 export class RevisitRepository {
   private static get db() { return getDatabase(); }
@@ -43,6 +44,7 @@ export class RevisitRepository {
       ]
     );
 
+    await OutboxRepository.enqueue('local_revisits', id, 'INSERT', record as unknown as Record<string, unknown>);
     return record;
   }
 
