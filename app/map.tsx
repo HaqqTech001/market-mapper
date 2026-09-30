@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { LatLng } from 'react-native-maps';
 import type { LocationSubscription } from '@/src/lib/location/locationService';
 import { NativeFieldMap } from '@/src/native/NativeFieldMap';
@@ -7,6 +7,7 @@ import { nativeLocationService } from '@/src/native/locationService';
 import { NativePathRecorder } from '@/src/native/NativePathRecorder';
 import { saveQuickBusiness, saveQuickJunction, saveQuickIssue } from '@/src/native/fieldCapture';
 import { getAssignedNativeMissions, requireNativeUserContext, type NativeMissionContext, type NativeUserContext } from '@/src/native/userContext';
+import { NativeBusinessCapture, NativeJunctionPicker, type BusinessCaptureValue } from '@/src/native/NativeCaptureSheets';
 
 const recorder = new NativePathRecorder();
 
@@ -18,8 +19,7 @@ export default function MapScreen() {
   const [userContext, setUserContext] = useState<NativeUserContext | null>(null);
   const [mission, setMission] = useState<NativeMissionContext | null>(null);
   const [contextError, setContextError] = useState<string | null>(null);
-  const [capture, setCapture] = useState<'business' | 'junction' | 'issue' | null>(null);
-  const [captureText, setCaptureText] = useState('');
+  const [capture, setCapture] = useState<'business' | 'junction' | null>(null);
   const subscription = useRef<LocationSubscription | null>(null);
 
   const path = snapshot.acceptedPoints.map((p) => ({ latitude: p.latitude, longitude: p.longitude }));
@@ -134,39 +134,16 @@ export default function MapScreen() {
       {snapshot.status === 'recording' || snapshot.status === 'paused' ? <View style={styles.captureActions}>
         <Pressable style={styles.captureButton} onPress={() => setCapture('business')}><Text style={styles.captureText}>+ Business</Text></Pressable>
         <Pressable style={styles.captureButton} onPress={() => setCapture('junction')}><Text style={styles.captureText}>+ Junction</Text></Pressable>
-        <Pressable style={styles.captureButton} onPress={() => setCapture('issue')}><Text style={styles.captureText}>Report Issue</Text></Pressable>
+        <Pressable style={styles.captureButton} onPress={async () => {
+          if (!current || !snapshot.missionId || !userContext) return;
+          const before = recorder.getSnapshot().status;
+          try {
+            await saveQuickIssue({ missionId: snapshot.missionId, userId: userContext.userId, pathSessionId: snapshot.sessionId, latitude: current.latitude, longitude: current.longitude }, { issueType: 'other', title: 'Field issue', description: 'Needs details' });
+            if (recorder.getSnapshot().status !== before) throw new Error('Issue capture changed path state.');
+            Alert.alert('Issue saved', 'Field issue draft saved. Path state was preserved.');
+          } catch (error) { Alert.alert('Issue capture failed', error instanceof Error ? error.message : 'Please try again.'); }
+        }}><Text style={styles.captureText}>Report Issue</Text></Pressable>
       </View> : null}
-      {snapshot.status === 'recording' || snapshot.status === 'paused' ? (
-        <View style={styles.captureActions}>
-          <Pressable style={styles.captureButton} onPress={async () => {
-            if (!current || !snapshot.missionId || !userContext) return;
-            const before = recorder.getSnapshot().status;
-            try {
-              await saveQuickBusiness({ missionId: snapshot.missionId, userId: userContext?.userId || '', pathSessionId: snapshot.sessionId, latitude: current.latitude, longitude: current.longitude }, { businessType: 'shop', activity: 'sells_goods', noVisibleName: true, relativePosition: 'unclear' });
-              if (recorder.getSnapshot().status !== before) throw new Error('Capture changed recorder state unexpectedly.');
-              Alert.alert('Business saved', 'Quick business draft saved. Open full business capture to complete details.');
-            } catch (error) { Alert.alert('Business capture failed', error instanceof Error ? error.message : 'Please try again.'); }
-          }}><Text style={styles.captureText}>+ Business</Text></Pressable>
-          <Pressable style={styles.captureButton} onPress={async () => {
-            if (!current || !snapshot.missionId || !snapshot.sessionId || !userContext) return;
-            const before = recorder.getSnapshot().status;
-            try {
-              await saveQuickJunction({ missionId: snapshot.missionId, userId: userContext?.userId || '', pathSessionId: snapshot.sessionId, latitude: current.latitude, longitude: current.longitude }, { junctionType: 'unknown' });
-              if (recorder.getSnapshot().status !== before) throw new Error('Capture changed recorder state unexpectedly.');
-              Alert.alert('Junction saved', 'Junction recorded without stopping the active path.');
-            } catch (error) { Alert.alert('Junction capture failed', error instanceof Error ? error.message : 'Please try again.'); }
-          }}><Text style={styles.captureText}>Junction</Text></Pressable>
-          <Pressable style={styles.captureButton} onPress={async () => {
-            if (!current || !snapshot.missionId) return;
-            const before = recorder.getSnapshot().status;
-            try {
-              await saveQuickIssue({ missionId: snapshot.missionId, userId: userContext?.userId || '', pathSessionId: snapshot.sessionId, latitude: current.latitude, longitude: current.longitude }, { issueType: 'other', title: 'Field issue', description: 'Needs details' });
-              if (recorder.getSnapshot().status !== before) throw new Error('Capture changed recorder state unexpectedly.');
-              Alert.alert('Issue saved', 'Field issue draft saved without stopping the path.');
-            } catch (error) { Alert.alert('Issue capture failed', error instanceof Error ? error.message : 'Please try again.'); }
-          }}><Text style={styles.captureText}>Issue</Text></Pressable>
-        </View>
-      ) : null}
       <View style={styles.actions}>
         {snapshot.status === 'idle' ? (
           <Pressable disabled={busy} style={styles.primary} onPress={() => { if (!mission) { Alert.alert('No active mission', 'You need an assigned mission before starting field mapping.'); return; } run(() => recorder.start(mission.id)); }}><Text style={styles.primaryText}>Start Path</Text></Pressable>
@@ -182,29 +159,21 @@ export default function MapScreen() {
           </>
         )}
       </View>
-      <Modal visible={capture !== null} transparent animationType="slide" onRequestClose={() => setCapture(null)}>
-        <View style={styles.modalBackdrop}><View style={styles.sheet}>
-          <Text style={styles.sheetTitle}>{capture === 'business' ? 'Quick Business' : capture === 'junction' ? 'Add Junction' : 'Report Field Issue'}</Text>
-          <Text style={styles.reviewNote}>Path recording state will not be changed by this capture.</Text>
-          <TextInput value={captureText} onChangeText={setCaptureText} placeholder={capture === 'business' ? 'Business name (optional)' : capture === 'junction' ? 'Local reference (optional)' : 'What happened?'} style={styles.input} placeholderTextColor="#6B7280" />
-          <View style={styles.sheetActions}>
-            <Pressable style={styles.secondary} onPress={() => { setCapture(null); setCaptureText(''); }}><Text style={styles.secondaryText}>Cancel</Text></Pressable>
-            <Pressable style={styles.primary} onPress={async () => {
-              if (!current || !capture || !snapshot.missionId) return;
-              setBusy(true);
-              try {
-                const context = { missionId: snapshot.missionId, userId: userContext?.userId || '', pathSessionId: snapshot.sessionId, latitude: current.latitude, longitude: current.longitude };
-                if (capture === 'business') await saveQuickBusiness(context, { name: captureText, businessType: 'shop', activity: 'sells_goods' });
-                if (capture === 'junction') await saveQuickJunction(context, { junctionType: 'unknown', displayName: captureText || undefined });
-                if (capture === 'issue') await saveQuickIssue(context, { issueType: 'other', title: 'Field issue', description: captureText || 'Field issue reported during mapping.' });
-                setCapture(null); setCaptureText('');
-                setSnapshot(recorder.getSnapshot());
-              } catch (error) { Alert.alert('Could not save capture', error instanceof Error ? error.message : 'Please try again.'); }
-              finally { setBusy(false); }
-            }}><Text style={styles.primaryText}>{busy ? 'Saving…' : 'Save'}</Text></Pressable>
-          </View>
-        </View></View>
-      </Modal>
+      <NativeBusinessCapture visible={capture === 'business'} onClose={() => setCapture(null)} onSave={async (value: BusinessCaptureValue) => {
+        if (!current || !snapshot.missionId || !userContext) throw new Error('Mapping context is unavailable.');
+        const before = recorder.getSnapshot().status;
+        await saveQuickBusiness({ missionId: snapshot.missionId, userId: userContext.userId, pathSessionId: snapshot.sessionId, latitude: current.latitude, longitude: current.longitude }, value);
+        if (recorder.getSnapshot().status !== before) throw new Error('Business capture changed path state.');
+        setCapture(null);
+        Alert.alert('Business saved', 'Business and offerings saved locally. Path recording state was preserved.');
+      }} />
+      <NativeJunctionPicker visible={capture === 'junction'} onClose={() => setCapture(null)} onSave={async (junctionType) => {
+        if (!current || !snapshot.missionId || !snapshot.sessionId || !userContext) throw new Error('Active path context is unavailable.');
+        const before = recorder.getSnapshot().status;
+        await saveQuickJunction({ missionId: snapshot.missionId, userId: userContext.userId, pathSessionId: snapshot.sessionId, latitude: current.latitude, longitude: current.longitude }, { junctionType });
+        if (recorder.getSnapshot().status !== before) throw new Error('Junction capture changed path state.');
+        Alert.alert('Junction saved', 'Junction saved without stopping the path.');
+      }} />
     </View>
   );
 }
@@ -233,9 +202,6 @@ const styles = StyleSheet.create({
   captureActions: { position: 'absolute', left: 16, right: 16, bottom: 88, flexDirection: 'row', gap: 8 },
   captureButton: { minHeight: 48, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#065F46', paddingHorizontal: 8 },
   captureText: { color: '#065F46', fontSize: 13, fontWeight: '900' },
-  captureActions: { position: 'absolute', left: 16, right: 16, bottom: 88, flexDirection: 'row', gap: 8 },
-  captureButton: { minHeight: 48, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#065F46' },
-  captureText: { color: '#065F46', fontSize: 14, fontWeight: '900' },
   actions: { position: 'absolute', left: 16, right: 16, bottom: 20, flexDirection: 'row', gap: 12 },
   primary: { minHeight: 52, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: '#047857', paddingHorizontal: 18 },
   primaryText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
@@ -248,9 +214,4 @@ const styles = StyleSheet.create({
   reviewNote: { fontSize: 14, lineHeight: 21, color: '#4B5563' },
   danger: { minHeight: 50, alignItems: 'center', justifyContent: 'center', borderRadius: 14, borderWidth: 2, borderColor: '#B91C1C' },
   dangerText: { color: '#991B1B', fontSize: 15, fontWeight: '900' },
-  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(17,24,39,0.35)' },
-  sheet: { backgroundColor: '#F9FAFB', padding: 20, borderTopLeftRadius: 22, borderTopRightRadius: 22, borderWidth: 1, borderColor: '#D1D5DB', gap: 12 },
-  sheetTitle: { fontSize: 22, fontWeight: '900', color: '#111827' },
-  input: { minHeight: 52, borderWidth: 2, borderColor: '#9CA3AF', borderRadius: 12, paddingHorizontal: 14, color: '#111827', backgroundColor: '#FFFFFF', fontSize: 16 },
-  sheetActions: { flexDirection: 'row', gap: 12 },
 });
