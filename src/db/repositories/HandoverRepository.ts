@@ -10,7 +10,7 @@ import { OutboxRepository } from './OutboxRepository';
 import { NotificationRepository } from './NotificationRepository';
 
 export class HandoverRepository {
-  private static db = getDatabase();
+  private static get db() { return getDatabase(); }
 
   static async createHandover(item: {
     id?: string;
