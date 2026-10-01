@@ -47,7 +47,7 @@ export async function saveQuickBusiness(
     directionConfidence: context.heading == null ? 'none' : 'medium',
     parentPathSessionId: context.pathSessionId ?? undefined,
     stallNumber: input.shopNumber,
-    sectionName: input.sectionName,
+    rowBlockFloor: input.sectionName,
     lineName: input.lineName,
     primaryCategoryId: input.primaryCategoryId,
     stability: input.stability ?? 'unknown',
