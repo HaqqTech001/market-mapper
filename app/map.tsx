@@ -118,6 +118,8 @@ export default function MapScreen() {
           <Metric label="Points" value={String(snapshot.acceptedPoints.length)} />
         </View>
         <Text style={styles.reviewNote}>Raw GPS samples remain in local SQLite for audit and correction. Saving queues the finalized path for synchronization.</Text>
+        <Pressable disabled={busy} style={styles.secondary} onPress={async()=>{const targets=await recorder.getReviewTargets();setReviewPoints(targets.points);setReviewJunctions(targets.junctions);setShowRestart(true)}}><Text style={styles.secondaryText}>Fix / Restart From Earlier Point</Text></Pressable>
+        <ReviewRestartSheet visible={showRestart} points={reviewPoints} junctions={reviewJunctions} onClose={()=>setShowRestart(false)} onPoint={async(id)=>{await recorder.restartFromPoint(id);setSnapshot(recorder.getSnapshot())}} onJunction={async(id)=>{await recorder.restartFromJunction(id);setSnapshot(recorder.getSnapshot())}} />
         <Pressable disabled={busy} style={styles.primary} onPress={async () => {
           setBusy(true);
           try {
@@ -177,7 +179,6 @@ export default function MapScreen() {
           </>
         )}
       </View>
-      {snapshot.status === 'reviewing' ? <ReviewRestartSheet visible={showRestart} points={reviewPoints} junctions={reviewJunctions} onClose={()=>setShowRestart(false)} onPoint={async(id)=>{await recorder.restartFromPoint(id);setSnapshot(recorder.getSnapshot())}} onJunction={async(id)=>{await recorder.restartFromJunction(id);setSnapshot(recorder.getSnapshot())}} /> : null}
       {mission && userContext ? <RemainingBranchesSheet visible={showBranches} missionId={mission.id} userId={userContext.userId} onClose={() => setShowBranches(false)} onSelect={({junction, branch}) => setBranchTarget({ branchId: branch.id, label: `${junction.operationalLabel} · ${branch.label}`, latitude: junction.latitude, longitude: junction.longitude })} /> : null}
       <NativeBusinessCapture visible={capture === 'business'} onClose={() => setCapture(null)} onSave={async (value: BusinessCaptureValue) => {
         if (!current || !snapshot.missionId || !userContext) throw new Error('Mapping context is unavailable.');
@@ -262,3 +263,11 @@ const styles = StyleSheet.create({
   danger: { minHeight: 50, alignItems: 'center', justifyContent: 'center', borderRadius: 14, borderWidth: 2, borderColor: '#B91C1C' },
   dangerText: { color: '#991B1B', fontSize: 15, fontWeight: '900' },
 });
+
+function syncLabel(snapshot: NativeSyncSnapshot): string {
+  if (snapshot.state === 'syncing') return 'Syncing';
+  if (snapshot.state === 'failed') return 'Sync failed · Tap to retry';
+  if (snapshot.state === 'pending') return 'Pending sync';
+  if (snapshot.state === 'synced') return 'Synced';
+  return 'Saved';
+}
