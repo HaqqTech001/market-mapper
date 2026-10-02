@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import type { LatLng } from 'react-native-maps';
 import type { LocationSubscription } from '@/src/lib/location/locationService';
@@ -35,6 +37,7 @@ export default function MapScreen() {
   const [syncBusy, setSyncBusy] = useState(false);
   const [branchTarget, setBranchTarget] = useState<{ branchId: string; label: string; latitude: number; longitude: number } | null>(null);
   const subscription = useRef<LocationSubscription | null>(null);
+  const insets = useSafeAreaInsets();
 
   const path = snapshot.acceptedPoints.map((p) => ({ latitude: p.latitude, longitude: p.longitude }));
 
@@ -146,7 +149,7 @@ export default function MapScreen() {
   return (
     <View style={styles.screen}>
       <NativeFieldMap currentLocation={current} path={path} />
-      <View style={styles.hud}>
+      <View style={[styles.hud,{top:Math.max(12,insets.top+8)}]}>
         <Text style={styles.missionText}>{mission ? mission.title : 'No assigned mission'}</Text>
         <View style={styles.hudTop}>
           <Text style={styles.state}>{snapshot.status === 'recording' ? snapshot.movementState : snapshot.status.toUpperCase()}</Text>
@@ -158,10 +161,10 @@ export default function MapScreen() {
         </View>
       </View>
       {snapshot.status === 'recording' || snapshot.status === 'paused' ? <View style={styles.captureActions}>
-        <Pressable style={styles.captureButton} onPress={() => setCapture('business')}><Text style={styles.captureText}>+ Business</Text></Pressable>
-        <Pressable style={styles.captureButton} onPress={() => setCapture('place')}><Text style={styles.captureText}>+ Place</Text></Pressable>
-        <Pressable style={styles.captureButton} onPress={() => setCapture('junction')}><Text style={styles.captureText}>Junction</Text></Pressable>
-        <Pressable style={styles.captureButton} onPress={() => setCapture('issue')}><Text style={styles.captureText}>Issue</Text></Pressable>
+        <MapAction icon="storefront-outline" label="Business" onPress={()=>setCapture('business')}/>
+        <MapAction icon="location-outline" label="Place" onPress={()=>setCapture('place')}/>
+        <MapAction icon="git-branch-outline" label="Junction" onPress={()=>setCapture('junction')}/>
+        <MapAction icon="warning-outline" label="Issue" onPress={()=>setCapture('issue')}/>
       </View> : null}
       {snapshot.status === 'idle' && mission && userContext ? <Pressable style={styles.branchesButton} onPress={() => setShowBranches(true)}><Text style={styles.branchesText}>Remaining Branches</Text></Pressable> : null}
       <View style={styles.actions}>
@@ -218,6 +221,7 @@ export default function MapScreen() {
   );
 }
 
+function MapAction({icon,label,onPress}:{icon:any;label:string;onPress:()=>void}){return <Pressable accessibilityLabel={label} style={styles.captureButton} onPress={onPress}><Ionicons name={icon} size={21} color="#065F46"/><Text style={styles.captureText}>{label}</Text></Pressable>}
 function Centered({ title, loading, action }: { title: string; loading?: boolean; action?: () => void }) {
   return <View style={styles.center}>{loading ? <ActivityIndicator /> : null}<Text style={styles.reviewTitle}>{title}</Text>{action ? <Pressable style={styles.primary} onPress={action}><Text style={styles.primaryText}>Try Again</Text></Pressable> : null}</View>;
 }
@@ -240,7 +244,7 @@ const styles = StyleSheet.create({
   metricValue: { fontSize: 18, fontWeight: '900', color: '#111827' },
   metricLabel: { marginTop: 2, fontSize: 12, fontWeight: '700', color: '#4B5563' },
   captureActions: { position: 'absolute', left: 16, right: 16, bottom: 88, flexDirection: 'row', gap: 8 },
-  captureButton: { minHeight: 48, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#065F46', paddingHorizontal: 8 },
+  captureButton: { minHeight: 56, flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#047857', paddingHorizontal: 6 },
   captureText: { color: '#065F46', fontSize: 13, fontWeight: '900' },
   syncRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},
   offlineLink:{minHeight:36,justifyContent:'center',paddingHorizontal:8},offlineLinkText:{fontSize:12,fontWeight:'900',color:'#374151',textDecorationLine:'underline'},
