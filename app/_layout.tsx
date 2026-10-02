@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { initializeNativeDatabase } from '@/src/native/database';
 import { OperationalRealtimeLifecycle } from '@/src/native/OperationalRealtimeLifecycle';
 import { FieldBottomNav } from '@/src/native/FieldBottomNav';
