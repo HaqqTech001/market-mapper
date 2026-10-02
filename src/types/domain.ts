@@ -791,6 +791,8 @@ export interface ChatChannel {
   createdAt: string;
 }
 
+export type ChatMessageType='text'|'image'|'video'|'audio'|'file';
+export interface ChatAttachment {localUri?:string;remotePath?:string;name:string;mimeType?:string;size?:number;durationMs?:number;width?:number;height?:number;}
 export interface ChatMessage {
   id: string;
   channelId: string;
@@ -800,6 +802,11 @@ export interface ChatMessage {
   senderRole: UserRole;
   replyToId?: string;
   text: string;
+  messageType?: ChatMessageType;
+  attachment?: ChatAttachment;
+  reactions?: Record<string,string[]>;
+  editedAt?: string;
+  deletedAt?: string;
   isPinned: boolean;
   linkedBusinessId?: string;
   linkedBusinessName?: string;
