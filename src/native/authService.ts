@@ -17,6 +17,17 @@ export async function signUpNative(input: { fullName: string; email: string; pas
   return { user: data.user, session: data.session, verificationRequired: Boolean(data.user && !data.session) };
 }
 
+export async function verifySignupOtp(email: string, token: string) {
+  const { data, error } = await nativeSupabase.auth.verifyOtp({
+    email: email.trim().toLowerCase(),
+    token: token.trim(),
+    type: 'signup',
+  });
+  if (error) throw error;
+  if (!data.session) throw new Error('VERIFICATION_SESSION_MISSING');
+  return data.session;
+}
+
 export async function resendSignupVerification(email: string) {
   const { error } = await nativeSupabase.auth.resend({ type: 'signup', email: email.trim().toLowerCase() });
   if (error) throw error;
