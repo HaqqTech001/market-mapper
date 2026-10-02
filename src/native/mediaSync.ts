@@ -5,11 +5,17 @@ import { getDatabase } from '@/src/db/sqlite';
 import type { MediaUploadQueueItem } from '@/src/types';
 
 function contentTypeFor(item: MediaUploadQueueItem) {
+  if(item.mediaType && item.mediaType.includes('/')) return item.mediaType;
   const ext = item.localUri.split('.').pop()?.toLowerCase();
   if (ext === 'png') return 'image/png';
   if (ext === 'webp') return 'image/webp';
   if (ext === 'heic' || ext === 'heif') return 'image/heic';
-  return 'image/jpeg';
+  if (ext === 'mp4' || ext === 'm4v') return 'video/mp4';
+  if (ext === 'mov') return 'video/quicktime';
+  if (ext === 'm4a') return 'audio/mp4';
+  if (ext === 'mp3') return 'audio/mpeg';
+  if (ext === 'pdf') return 'application/pdf';
+  return 'application/octet-stream';
 }
 
 async function uriToArrayBuffer(uri: string): Promise<ArrayBuffer> {
@@ -31,6 +37,12 @@ async function attachRemotePath(item: MediaUploadQueueItem) {
   const db = getDatabase();
   const now = new Date().toISOString();
   await db.runAsync("UPDATE local_media SET upload_status='uploaded', remote_path=?, updated_at=? WHERE entity_type=? AND entity_id=? AND local_uri=?;", [item.remotePath, now, item.entityType, item.entityId, item.localUri]);
+  if (item.entityType === 'chat') {
+    const row = await db.getFirstAsync<any>('SELECT attachment_json FROM local_chat_messages WHERE id=?;', [item.entityId]);
+    let attachment:any={}; try{attachment=row?.attachment_json?JSON.parse(row.attachment_json):{}}catch{}
+    attachment.remotePath=item.remotePath;
+    await db.runAsync('UPDATE local_chat_messages SET attachment_json=? WHERE id=?;', [JSON.stringify(attachment),item.entityId]);
+  }
   if (item.entityType === 'business') {
     await db.runAsync('UPDATE local_businesses SET remote_photo_path=?, updated_at=? WHERE id=?;', [item.remotePath, now, item.entityId]);
   }
