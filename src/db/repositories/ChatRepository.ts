@@ -5,7 +5,7 @@
  */
 
 import { getDatabase } from '../sqlite';
-import { ChatChannel, ChatMessage, UserRole, SyncStatus } from '../../types';
+import { ChatChannel, ChatMessage, UserRole, SyncStatus, ChatMessageType, ChatAttachment } from '../../types';
 import { OutboxRepository } from './OutboxRepository';
 
 export class ChatRepository {
@@ -101,6 +101,11 @@ export class ChatRepository {
         senderRole: (r.sender_role || r.senderRole || 'mapper') as UserRole,
         replyToId: r.reply_to_id || r.replyToId,
         text: r.text,
+        messageType: (r.message_type || 'text') as ChatMessageType,
+        attachment: r.attachment_json ? JSON.parse(r.attachment_json) : undefined,
+        reactions: r.reactions_json ? JSON.parse(r.reactions_json) : undefined,
+        editedAt: r.edited_at || undefined,
+        deletedAt: r.deleted_at || undefined,
         isPinned: Boolean(r.is_pinned || r.isPinned),
         linkedBusinessId: r.linked_business_id || r.linkedBusinessId,
         linkedBusinessName: r.linked_business_name || r.linkedBusinessName,
@@ -124,6 +129,8 @@ export class ChatRepository {
     senderRole: UserRole;
     replyToId?: string;
     text: string;
+    messageType?: ChatMessageType;
+    attachment?: ChatAttachment;
     isPinned?: boolean;
     linkedBusinessId?: string;
     linkedBusinessName?: string;
@@ -146,6 +153,8 @@ export class ChatRepository {
       senderRole: msg.senderRole,
       replyToId: msg.replyToId,
       text: msg.text,
+      messageType: msg.messageType || 'text',
+      attachment: msg.attachment,
       isPinned: msg.isPinned || false,
       linkedBusinessId: msg.linkedBusinessId,
       linkedBusinessName: msg.linkedBusinessName,
@@ -165,8 +174,8 @@ export class ChatRepository {
         id, channel_id, sender_id, sender_name, sender_avatar, sender_role,
         reply_to_id, text, is_pinned, linked_business_id, linked_business_name,
         linked_path_id, linked_path_name, linked_issue_id, linked_issue_title,
-        shared_location_json, created_at, sync_status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local_only');`,
+        shared_location_json, message_type, attachment_json, created_at, sync_status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local_only');`,
       [
         id,
         newMsg.channelId,
@@ -184,6 +193,8 @@ export class ChatRepository {
         newMsg.linkedIssueId || null,
         newMsg.linkedIssueTitle || null,
         sharedLocJson,
+        msg.messageType || 'text',
+        msg.attachment ? JSON.stringify(msg.attachment) : null,
         now,
       ]
     );
@@ -193,7 +204,7 @@ export class ChatRepository {
       `UPDATE local_chat_channels
        SET last_message_snippet = ?, last_message_time = ?
        WHERE id = ?;`,
-      [newMsg.text.slice(0, 60), now, newMsg.channelId]
+      [(newMsg.text || newMsg.attachment?.name || newMsg.messageType || 'Message').slice(0, 60), now, newMsg.channelId]
     );
 
     await OutboxRepository.enqueue('local_chat_messages', id, 'INSERT', newMsg as unknown as Record<string, unknown>);
