@@ -752,3 +752,12 @@ export const DDL_V6 = [
 
 
 
+
+export const MIGRATION_VERSION_7 = 7;
+export const DDL_V7 = [
+  `ALTER TABLE local_chat_messages ADD COLUMN message_type TEXT NOT NULL DEFAULT 'text';`,
+  `ALTER TABLE local_chat_messages ADD COLUMN attachment_json TEXT;`,
+  `ALTER TABLE local_chat_messages ADD COLUMN reactions_json TEXT;`,
+  `ALTER TABLE local_chat_messages ADD COLUMN edited_at TEXT;`,
+  `ALTER TABLE local_chat_messages ADD COLUMN deleted_at TEXT;`
+];
