@@ -7,6 +7,7 @@
 import { getDatabase } from '../sqlite';
 import { ChatChannel, ChatMessage, UserRole, SyncStatus, ChatMessageType, ChatAttachment } from '../../types';
 import { OutboxRepository } from './OutboxRepository';
+import { MediaUploadRepository } from './MediaUploadRepository';
 
 export class ChatRepository {
   private static get db() { return getDatabase(); }
@@ -208,6 +209,11 @@ export class ChatRepository {
     );
 
     await OutboxRepository.enqueue('local_chat_messages', id, 'INSERT', newMsg as unknown as Record<string, unknown>);
+    if(msg.attachment?.localUri){
+      const ext=(msg.attachment.name.split('.').pop()||'bin').replace(/[^a-z0-9]/gi,'').toLowerCase()||'bin';
+      const remotePath=`${msg.senderId}/chat/${id}/attachment.${ext}`;
+      await MediaUploadRepository.enqueue({localUri:msg.attachment.localUri,bucket:'field-media',remotePath,entityType:'chat',entityId:id,mediaType:msg.attachment.mimeType||msg.messageType||'application/octet-stream'});
+    }
 
     return newMsg;
   }
