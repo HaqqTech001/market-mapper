@@ -1,7 +1,7 @@
 import {
-  DDL_V1, DDL_V2, DDL_V3, DDL_V4, DDL_V5, DDL_V6,
+  DDL_V1, DDL_V2, DDL_V3, DDL_V4, DDL_V5, DDL_V6, DDL_V7,
   MIGRATION_VERSION_1, MIGRATION_VERSION_2, MIGRATION_VERSION_3,
-  MIGRATION_VERSION_4, MIGRATION_VERSION_5, MIGRATION_VERSION_6,
+  MIGRATION_VERSION_4, MIGRATION_VERSION_5, MIGRATION_VERSION_6, MIGRATION_VERSION_7,
 } from '@/src/db/schema';
 import { seedInitialCatalogue } from '@/src/db/seed/catalogueSeed';
 import type { DatabaseAdapter } from '@/src/db/sqlite';
@@ -13,6 +13,7 @@ const migrations = [
   { version: MIGRATION_VERSION_4, name: 'v4_team_coordination_and_chat', ddl: DDL_V4 },
   { version: MIGRATION_VERSION_5, name: 'v5_junction_types_and_relative_positions', ddl: DDL_V5 },
   { version: MIGRATION_VERSION_6, name: 'v6_junction_branch_tracking', ddl: DDL_V6 },
+  { version: MIGRATION_VERSION_7, name: 'v7_rich_chat_messages', ddl: DDL_V7 },
 ] as const;
 
 const ADD_COLUMN_PATTERN =
