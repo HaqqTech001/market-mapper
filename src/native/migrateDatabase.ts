@@ -4,7 +4,7 @@ import {
   MIGRATION_VERSION_4, MIGRATION_VERSION_5, MIGRATION_VERSION_6,
 } from '@/src/db/schema';
 import { seedInitialCatalogue } from '@/src/db/seed/catalogueSeed';
-import { getExpoSQLiteAdapter } from './ExpoSQLiteAdapter';
+import type { DatabaseAdapter } from '@/src/db/sqlite';
 
 const migrations = [
   { version: MIGRATION_VERSION_1, name: 'initial_v1_schema', ddl: DDL_V1 },
@@ -19,7 +19,7 @@ const ADD_COLUMN_PATTERN =
   /^ALTER\s+TABLE\s+["`\[]?([^\s"`\]]+)["`\]]?\s+ADD\s+COLUMN\s+["`\[]?([^\s"`\]]+)["`\]]?/i;
 
 async function hasColumn(
-  db: Awaited<ReturnType<typeof getExpoSQLiteAdapter>>,
+  db: DatabaseAdapter,
   tableName: string,
   columnName: string,
 ): Promise<boolean> {
@@ -33,7 +33,7 @@ async function hasColumn(
 }
 
 async function executeMigrationStatement(
-  db: Awaited<ReturnType<typeof getExpoSQLiteAdapter>>,
+  db: DatabaseAdapter,
   ddl: string,
 ): Promise<void> {
   const addColumn = ddl.trim().match(ADD_COLUMN_PATTERN);
@@ -46,8 +46,7 @@ async function executeMigrationStatement(
   await db.execAsync(ddl);
 }
 
-export async function migrateNativeDatabase(): Promise<number> {
-  const db = await getExpoSQLiteAdapter();
+export async function migrateNativeDatabase(db: DatabaseAdapter): Promise<number> {
 
   await db.execAsync('PRAGMA journal_mode = WAL;');
   await db.execAsync('PRAGMA foreign_keys = ON;');
