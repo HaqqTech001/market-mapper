@@ -43,12 +43,14 @@ export default function RootLayout() {
   }
 
   return (
+    <SafeAreaProvider>
     <AuthGate>
       <OperationalRealtimeLifecycle />
       <StatusBar style="dark" />
       <View style={{flex:1}}><Stack screenOptions={{ headerShown: false }} /></View>
       {CORE.includes(pathname) ? <FieldBottomNav /> : null}
     </AuthGate>
+    </SafeAreaProvider>
   );
 }
 
