@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import type { LatLng } from 'react-native-maps';
+import MapView, { type LatLng, type MapType } from 'react-native-maps';
 import type { LocationSubscription } from '@/src/lib/location/locationService';
 import { NativeFieldMap } from '@/src/native/NativeFieldMap';
 import { nativeLocationService } from '@/src/native/locationService';
@@ -37,6 +37,9 @@ export default function MapScreen() {
   const [syncBusy, setSyncBusy] = useState(false);
   const [branchTarget, setBranchTarget] = useState<{ branchId: string; label: string; latitude: number; longitude: number } | null>(null);
   const subscription = useRef<LocationSubscription | null>(null);
+  const mapRef = useRef<MapView | null>(null);
+  const [mapType,setMapType]=useState<MapType>('standard');
+  const [showMapTypes,setShowMapTypes]=useState(false);
   const insets = useSafeAreaInsets();
 
   const path = snapshot.acceptedPoints.map((p) => ({ latitude: p.latitude, longitude: p.longitude }));
@@ -109,7 +112,7 @@ export default function MapScreen() {
       <ScrollView contentContainerStyle={styles.review}>
         <Text style={styles.eyebrow}>PATH REVIEW</Text>
         <Text style={styles.reviewTitle}>Check this path before saving</Text>
-        <View style={styles.reviewMap}><NativeFieldMap currentLocation={current} path={path} /></View>
+        <View style={styles.reviewMap}><NativeFieldMap currentLocation={current} path={path} mapType={mapType} /></View>
         {branchTarget ? <Text style={styles.branchTarget}>Return to {branchTarget.label} to map the selected branch.</Text> : null}
         <View style={styles.syncRow}><Pressable disabled={syncBusy} onPress={async()=>{setSyncBusy(true);try{setSync({...sync,state:'syncing'});setSync(await (sync.state==='failed'?retryNativeSync():runNativeSync()));}finally{setSyncBusy(false)}}} style={[styles.syncBadge,sync.state==='failed'&&styles.syncFailed]}>
           <Text style={[styles.syncText,sync.state==='failed'&&styles.syncFailedText]}>{syncLabel(sync)}{sync.relationalPending+sync.mediaPending>0?` · ${sync.relationalPending+sync.mediaPending}`:''}</Text>
@@ -148,7 +151,7 @@ export default function MapScreen() {
 
   return (
     <View style={styles.screen}>
-      <NativeFieldMap currentLocation={current} path={path} />
+      <NativeFieldMap currentLocation={current} path={path} mapType={mapType} />
       <View style={[styles.hud,{top:Math.max(12,insets.top+8)}]}>
         <Text style={styles.missionText}>{mission ? mission.title : 'No assigned mission'}</Text>
         <View style={styles.hudTop}>
@@ -160,6 +163,13 @@ export default function MapScreen() {
           <Metric label="Time" value={formatTime(snapshot.durationSeconds)} />
         </View>
       </View>
+      <View style={[styles.mapControls,{top:Math.max(150,insets.top+138)}]}>
+        <Pressable accessibilityLabel="Center on my location" style={styles.mapControl} onPress={()=>{if(current)mapRef.current?.animateCamera({center:current,zoom:18},{duration:450});else ensureLocation();}}><Ionicons name="locate-outline" size={23} color="#111827"/></Pressable>
+        <Pressable accessibilityLabel="Change map view" style={styles.mapControl} onPress={()=>setShowMapTypes(v=>!v)}><Ionicons name="layers-outline" size={23} color="#111827"/></Pressable>
+        <Pressable accessibilityLabel="Zoom in" style={styles.mapControl} onPress={()=>mapRef.current?.getCamera().then(cam=>mapRef.current?.animateCamera({zoom:(cam.zoom||17)+1},{duration:250}))}><Ionicons name="add" size={24} color="#111827"/></Pressable>
+        <Pressable accessibilityLabel="Zoom out" style={styles.mapControl} onPress={()=>mapRef.current?.getCamera().then(cam=>mapRef.current?.animateCamera({zoom:Math.max(3,(cam.zoom||17)-1)},{duration:250}))}><Ionicons name="remove" size={24} color="#111827"/></Pressable>
+      </View>
+      {showMapTypes?<View style={[styles.mapTypeMenu,{top:Math.max(150,insets.top+138)}]}>{(['standard','satellite','hybrid'] as MapType[]).map(t=><Pressable key={t} style={styles.mapTypeRow} onPress={()=>{setMapType(t);setShowMapTypes(false)}}><Ionicons name={mapType===t?'radio-button-on':'radio-button-off'} size={19} color="#047857"/><Text style={styles.mapTypeText}>{t[0].toUpperCase()+t.slice(1)}</Text></Pressable>)}</View>:null}
       {snapshot.status === 'recording' || snapshot.status === 'paused' ? <View style={styles.captureActions}>
         <MapAction icon="storefront-outline" label="Business" onPress={()=>setCapture('business')}/>
         <MapAction icon="location-outline" label="Place" onPress={()=>setCapture('place')}/>
@@ -243,6 +253,7 @@ const styles = StyleSheet.create({
   metric: { minWidth: 92, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 10, backgroundColor: '#F3F4F6' },
   metricValue: { fontSize: 18, fontWeight: '900', color: '#111827' },
   metricLabel: { marginTop: 2, fontSize: 12, fontWeight: '700', color: '#4B5563' },
+  mapControls:{position:'absolute',right:14,gap:8},mapControl:{width:48,height:48,borderRadius:14,borderWidth:2,borderColor:'#D1D5DB',backgroundColor:'#FFFFFF',alignItems:'center',justifyContent:'center'},mapTypeMenu:{position:'absolute',right:72,width:155,borderWidth:2,borderColor:'#D1D5DB',borderRadius:14,backgroundColor:'#FFFFFF',padding:6},mapTypeRow:{minHeight:44,flexDirection:'row',alignItems:'center',gap:9,paddingHorizontal:10},mapTypeText:{fontSize:14,fontWeight:'800',color:'#111827'},
   captureActions: { position: 'absolute', left: 16, right: 16, bottom: 88, flexDirection: 'row', gap: 8 },
   captureButton: { minHeight: 56, flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#047857', paddingHorizontal: 6 },
   captureText: { color: '#065F46', fontSize: 13, fontWeight: '900' },
