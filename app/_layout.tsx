@@ -5,6 +5,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { initializeNativeDatabase } from '@/src/native/database';
 import { OperationalRealtimeLifecycle } from '@/src/native/OperationalRealtimeLifecycle';
 import { FieldBottomNav } from '@/src/native/FieldBottomNav';
+import { AuthGate } from '@/src/native/AuthGate';
 
 const CORE=['/','/map','/missions','/chat','/more'];
 
@@ -42,12 +43,12 @@ export default function RootLayout() {
   }
 
   return (
-    <>
+    <AuthGate>
       <OperationalRealtimeLifecycle />
       <StatusBar style="dark" />
       <View style={{flex:1}}><Stack screenOptions={{ headerShown: false }} /></View>
       {CORE.includes(pathname) ? <FieldBottomNav /> : null}
-    </>
+    </AuthGate>
   );
 }
 
