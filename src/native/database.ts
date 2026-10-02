@@ -23,5 +23,5 @@ export async function initializeNativeDatabase(): Promise<void> {
   }
 
   const { migrateNativeDatabase } = await import('./migrateDatabase');
-  await migrateNativeDatabase();
+  await migrateNativeDatabase(new ExpoSQLiteAdapter(db));
 }
