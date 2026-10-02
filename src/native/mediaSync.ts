@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { nativeSupabase } from './supabase';
 import { MediaUploadRepository } from '@/src/db/repositories/MediaUploadRepository';
 import { getDatabase } from '@/src/db/sqlite';
@@ -42,6 +42,8 @@ async function attachRemotePath(item: MediaUploadQueueItem) {
     let attachment:any={}; try{attachment=row?.attachment_json?JSON.parse(row.attachment_json):{}}catch{}
     attachment.remotePath=item.remotePath;
     await db.runAsync('UPDATE local_chat_messages SET attachment_json=? WHERE id=?;', [JSON.stringify(attachment),item.entityId]);
+    const message=await db.getFirstAsync<any>('SELECT * FROM local_chat_messages WHERE id=?;',[item.entityId]);
+    if(message){const {error}=await nativeSupabase.from('chat_messages').update({attachment}).eq('id',item.entityId);if(error)throw error;}
   }
   if (item.entityType === 'business') {
     await db.runAsync('UPDATE local_businesses SET remote_photo_path=?, updated_at=? WHERE id=?;', [item.remotePath, now, item.entityId]);
