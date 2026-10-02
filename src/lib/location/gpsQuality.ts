@@ -89,9 +89,6 @@ export function computeGpsQualityStatus(
   return 'searching';
 }
 
-export { MovementDetector } from './movementDetector';
-export type { MovementState, MovementEvaluation, LocationObservation, StationaryAnchor } from './movementDetector';
-
 /**
  * Validates an incoming raw GPS sample against conservative physical filters.
  * Returns acceptance flag and standardized rejection reason if excluded from working path polyline.
