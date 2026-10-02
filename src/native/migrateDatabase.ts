@@ -15,6 +15,37 @@ const migrations = [
   { version: MIGRATION_VERSION_6, name: 'v6_junction_branch_tracking', ddl: DDL_V6 },
 ] as const;
 
+const ADD_COLUMN_PATTERN =
+  /^ALTER\s+TABLE\s+["`\[]?([^\s"`\]]+)["`\]]?\s+ADD\s+COLUMN\s+["`\[]?([^\s"`\]]+)["`\]]?/i;
+
+async function hasColumn(
+  db: Awaited<ReturnType<typeof getExpoSQLiteAdapter>>,
+  tableName: string,
+  columnName: string,
+): Promise<boolean> {
+  const escapedTable = tableName.replace(/"/g, '""');
+  const columns = await db.getAllAsync<{ name: string }>(
+    `PRAGMA table_info("${escapedTable}");`,
+  );
+  return columns.some(
+    (column) => column.name.toLowerCase() === columnName.toLowerCase(),
+  );
+}
+
+async function executeMigrationStatement(
+  db: Awaited<ReturnType<typeof getExpoSQLiteAdapter>>,
+  ddl: string,
+): Promise<void> {
+  const addColumn = ddl.trim().match(ADD_COLUMN_PATTERN);
+
+  if (addColumn) {
+    const [, tableName, columnName] = addColumn;
+    if (await hasColumn(db, tableName, columnName)) return;
+  }
+
+  await db.execAsync(ddl);
+}
+
 export async function migrateNativeDatabase(): Promise<number> {
   const db = await getExpoSQLiteAdapter();
 
@@ -33,7 +64,11 @@ export async function migrateNativeDatabase(): Promise<number> {
 
   for (const migration of migrations) {
     if (version >= migration.version) continue;
-    for (const ddl of migration.ddl) await db.execAsync(ddl);
+
+    for (const ddl of migration.ddl) {
+      await executeMigrationStatement(db, ddl);
+    }
+
     await db.runAsync(
       'INSERT OR REPLACE INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?);',
       [migration.version, migration.name, new Date().toISOString()],
