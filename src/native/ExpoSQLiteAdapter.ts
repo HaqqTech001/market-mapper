@@ -1,6 +1,5 @@
 import type { SQLiteBindValue, SQLiteDatabase } from 'expo-sqlite';
 import type { DatabaseAdapter } from '@/src/db/sqlite';
-import { getNativeDatabase } from './database';
 
 type RunResult = { lastInsertRowId: number; changes: number };
 
@@ -28,11 +27,3 @@ export class ExpoSQLiteAdapter implements DatabaseAdapter {
   }
 }
 
-let adapterPromise: Promise<ExpoSQLiteAdapter> | null = null;
-
-export function getExpoSQLiteAdapter(): Promise<ExpoSQLiteAdapter> {
-  if (!adapterPromise) {
-    adapterPromise = getNativeDatabase().then((db) => new ExpoSQLiteAdapter(db));
-  }
-  return adapterPromise;
-}
