@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { ScreenSafeArea, ScreenHeader } from '@/src/native/ScreenScaffold';
 import { useFocusEffect, router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { OutboxRepository } from '@/src/db/repositories/OutboxRepository';
@@ -12,13 +13,13 @@ export default function OfflineDataScreen(){
  useFocusEffect(useCallback(()=>{load()},[load]));
  const run=async(retry=false)=>{setBusy(true);try{setSync(await (retry?retryNativeSync():runNativeSync()));await load()}finally{setBusy(false)}};
  const failed=outbox.filter(x=>x.status==='failed').length+media.filter(x=>x.status==='failed').length; const conflicts=outbox.filter(x=>x.status==='conflict').length;
- return <View style={s.page}><View style={s.header}><Pressable onPress={()=>router.back()} style={s.back}><Text style={s.backText}>‹</Text></Pressable><View><Text style={s.eyebrow}>OFFLINE DATA</Text><Text style={s.title}>Saved on this device</Text></View></View><ScrollView contentContainerStyle={s.body}>
+ return <ScreenSafeArea><ScreenHeader eyebrow="OFFLINE DATA" title="Saved on this device" back/><ScrollView contentContainerStyle={s.body}>
   <View style={s.banner}><Text style={s.bannerTitle}>{outbox.length+media.length===0?'Everything is synced':'Your field work is safe locally'}</Text><Text style={s.help}>{outbox.length} data change(s) · {media.length} media upload(s){failed?' · '+failed+' need retry':''}{conflicts?' · '+conflicts+' conflict(s)':''}</Text></View>
   <View style={s.actions}><Pressable disabled={busy} style={s.primary} onPress={()=>run(false)}><Text style={s.primaryText}>{busy?'Syncing…':'Sync Now'}</Text></Pressable>{failed?<Pressable disabled={busy} style={s.secondary} onPress={()=>run(true)}><Text style={s.secondaryText}>Retry Failed</Text></Pressable>:null}</View>{conflicts?<Pressable style={s.conflictLink} onPress={()=>router.push('/sync-conflicts')}><Text style={s.conflictLinkText}>Review {conflicts} preserved conflict{conflicts===1?'':'s'}</Text></Pressable>:null}
   {sync?.lastError?<Text style={s.error}>{sync.lastError}</Text>:null}
   <Text style={s.section}>DATA CHANGES</Text>{outbox.length===0?<Text style={s.help}>No pending relational changes.</Text>:outbox.map(x=><QueueCard key={x.id} title={friendly(x.tableName)} status={x.status} detail={x.action+' · '+x.recordId.slice(-8)} error={x.errorMessage} retries={x.retryCount}/>)}
   <Text style={s.section}>MEDIA</Text>{media.length===0?<Text style={s.help}>No pending photos.</Text>:media.map(x=><QueueCard key={x.id} title="Business photo" status={x.status} detail={x.entityId.slice(-8)} error={x.errorMessage} retries={x.retryCount}/>)}
- </ScrollView></View>
+ </ScrollView></ScreenSafeArea>
 }
 function friendly(t:string){return ({businesses:'Business',market_paths:'Path',path_junctions:'Junction',junction_branches:'Junction branch',local_field_issues:'Field issue',local_market_places:'Place'} as Record<string,string>)[t]||'Saved field record'}
 function QueueCard({title,status,detail,error,retries}:{title:string;status:string;detail:string;error?:string;retries:number}){return <View style={[s.card,(status==='failed'||status==='conflict')&&s.cardFailed]}><View style={s.row}><Text style={s.cardTitle}>{title}</Text><Text style={[s.status,(status==='failed'||status==='conflict')&&s.statusFailed]}>{status.toUpperCase()}</Text></View><Text style={s.help}>{detail} · attempt {retries}/5</Text>{error?<Text style={s.error}>{humanError(error)}</Text>:null}</View>}
