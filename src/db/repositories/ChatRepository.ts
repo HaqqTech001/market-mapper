@@ -213,6 +213,17 @@ export class ChatRepository {
     return newMsg;
   }
 
+  static async react(messageId:string,userId:string,emoji:string):Promise<void>{
+    const row=await this.db.getFirstAsync<any>('SELECT reactions_json FROM local_chat_messages WHERE id=?;',[messageId]);
+    let reactions:Record<string,string[]>={};try{reactions=row?.reactions_json?JSON.parse(row.reactions_json):{}}catch{}
+    for(const key of Object.keys(reactions))reactions[key]=(reactions[key]||[]).filter(id=>id!==userId);
+    reactions[emoji]=[...(reactions[emoji]||[]),userId];for(const key of Object.keys(reactions))if(!reactions[key].length)delete reactions[key];
+    await this.db.runAsync('UPDATE local_chat_messages SET reactions_json=? WHERE id=?;',[JSON.stringify(reactions),messageId]);
+    await OutboxRepository.enqueue('local_chat_messages',messageId,'UPDATE',{id:messageId,reactions});
+  }
+  static async editMessage(messageId:string,text:string):Promise<void>{const editedAt=new Date().toISOString();await this.db.runAsync('UPDATE local_chat_messages SET text=?,edited_at=? WHERE id=?;',[text,editedAt,messageId]);await OutboxRepository.enqueue('local_chat_messages',messageId,'UPDATE',{id:messageId,text,editedAt})}
+  static async deleteMessage(messageId:string):Promise<void>{const deletedAt=new Date().toISOString();await this.db.runAsync("UPDATE local_chat_messages SET text='',deleted_at=? WHERE id=?;",[deletedAt,messageId]);await OutboxRepository.enqueue('local_chat_messages',messageId,'UPDATE',{id:messageId,text:'',deletedAt})}
+
   static async togglePin(messageId: string, isPinned: boolean): Promise<boolean> {
     await this.db.runAsync(
       `UPDATE local_chat_messages SET is_pinned = ? WHERE id = ?;`,
