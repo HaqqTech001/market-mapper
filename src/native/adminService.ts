@@ -18,7 +18,7 @@ export async function listAdminMissions():Promise<AdminMissionSummary[]>{
 }
 
 export async function createAdminMission(input:{title:string;marketName:string;description?:string;type?:string}){
- const admin=await requireAdmin();const id=crypto.randomUUID();const now=new Date().toISOString();
- const {data,error}=await nativeSupabase.from('missions').insert({id,title:input.title.trim(),market_name:input.marketName.trim(),description:input.description?.trim()||null,status:'planning',created_by:admin.userId,created_at:now,updated_at:now}).select('id').single();
+ const admin=await requireAdmin();const now=new Date().toISOString();
+ const {data,error}=await nativeSupabase.from('missions').insert({title:input.title.trim(),market_name:input.marketName.trim(),description:input.description?.trim()||null,instructions:input.description?.trim()||null,mission_type:input.type||'initial_mapping',status:'draft',created_by:admin.userId,created_at:now,updated_at:now}).select('id').single();
  if(error)throw error;return data;
 }
