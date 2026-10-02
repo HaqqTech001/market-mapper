@@ -40,6 +40,7 @@ export default function MapScreen() {
   const mapRef = useRef<MapView | null>(null);
   const [mapType,setMapType]=useState<MapType>('standard');
   const [showMapTypes,setShowMapTypes]=useState(false);
+  const [showFieldMenu,setShowFieldMenu]=useState(false);
   const insets = useSafeAreaInsets();
 
   const path = snapshot.acceptedPoints.map((p) => ({ latitude: p.latitude, longitude: p.longitude }));
@@ -151,7 +152,7 @@ export default function MapScreen() {
 
   return (
     <View style={styles.screen}>
-      <NativeFieldMap currentLocation={current} path={path} mapType={mapType} />
+      <NativeFieldMap ref={mapRef} currentLocation={current} path={path} mapType={mapType} />
       <View style={[styles.hud,{top:Math.max(12,insets.top+8)}]}>
         <Text style={styles.missionText}>{mission ? mission.title : 'No assigned mission'}</Text>
         <View style={styles.hudTop}>
@@ -168,7 +169,9 @@ export default function MapScreen() {
         <Pressable accessibilityLabel="Change map view" style={styles.mapControl} onPress={()=>setShowMapTypes(v=>!v)}><Ionicons name="layers-outline" size={23} color="#111827"/></Pressable>
         <Pressable accessibilityLabel="Zoom in" style={styles.mapControl} onPress={()=>mapRef.current?.getCamera().then(cam=>mapRef.current?.animateCamera({zoom:(cam.zoom||17)+1},{duration:250}))}><Ionicons name="add" size={24} color="#111827"/></Pressable>
         <Pressable accessibilityLabel="Zoom out" style={styles.mapControl} onPress={()=>mapRef.current?.getCamera().then(cam=>mapRef.current?.animateCamera({zoom:Math.max(3,(cam.zoom||17)-1)},{duration:250}))}><Ionicons name="remove" size={24} color="#111827"/></Pressable>
+        <Pressable accessibilityLabel="Field map tools" style={styles.mapControl} onPress={()=>setShowFieldMenu(v=>!v)}><Ionicons name="options-outline" size={23} color="#111827"/></Pressable>
       </View>
+      {showFieldMenu?<View style={[styles.fieldMenu,{top:Math.max(150,insets.top+138)}]}><Pressable style={styles.fieldRow} onPress={()=>setShowBranches(true)}><Ionicons name="git-branch-outline" size={20} color="#065F46"/><Text style={styles.fieldText}>Remaining branches</Text></Pressable><Pressable style={styles.fieldRow} onPress={()=>router.push('/revisits')}><Ionicons name="refresh-circle-outline" size={20} color="#065F46"/><Text style={styles.fieldText}>Revisits</Text></Pressable><Pressable style={styles.fieldRow} onPress={()=>router.push('/offline-data')}><Ionicons name="cloud-offline-outline" size={20} color="#065F46"/><Text style={styles.fieldText}>Offline data</Text></Pressable></View>:null}
       {showMapTypes?<View style={[styles.mapTypeMenu,{top:Math.max(150,insets.top+138)}]}>{(['standard','satellite','hybrid'] as MapType[]).map(t=><Pressable key={t} style={styles.mapTypeRow} onPress={()=>{setMapType(t);setShowMapTypes(false)}}><Ionicons name={mapType===t?'radio-button-on':'radio-button-off'} size={19} color="#047857"/><Text style={styles.mapTypeText}>{t[0].toUpperCase()+t.slice(1)}</Text></Pressable>)}</View>:null}
       {snapshot.status === 'recording' || snapshot.status === 'paused' ? <View style={styles.captureActions}>
         <MapAction icon="storefront-outline" label="Business" onPress={()=>setCapture('business')}/>
@@ -253,7 +256,7 @@ const styles = StyleSheet.create({
   metric: { minWidth: 92, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 10, backgroundColor: '#F3F4F6' },
   metricValue: { fontSize: 18, fontWeight: '900', color: '#111827' },
   metricLabel: { marginTop: 2, fontSize: 12, fontWeight: '700', color: '#4B5563' },
-  mapControls:{position:'absolute',right:14,gap:8},mapControl:{width:48,height:48,borderRadius:14,borderWidth:2,borderColor:'#D1D5DB',backgroundColor:'#FFFFFF',alignItems:'center',justifyContent:'center'},mapTypeMenu:{position:'absolute',right:72,width:155,borderWidth:2,borderColor:'#D1D5DB',borderRadius:14,backgroundColor:'#FFFFFF',padding:6},mapTypeRow:{minHeight:44,flexDirection:'row',alignItems:'center',gap:9,paddingHorizontal:10},mapTypeText:{fontSize:14,fontWeight:'800',color:'#111827'},
+  mapControls:{position:'absolute',right:14,gap:8},mapControl:{width:48,height:48,borderRadius:14,borderWidth:2,borderColor:'#D1D5DB',backgroundColor:'#FFFFFF',alignItems:'center',justifyContent:'center'},mapTypeMenu:{position:'absolute',right:72,width:155,borderWidth:2,borderColor:'#D1D5DB',borderRadius:14,backgroundColor:'#FFFFFF',padding:6},mapTypeRow:{minHeight:44,flexDirection:'row',alignItems:'center',gap:9,paddingHorizontal:10},mapTypeText:{fontSize:14,fontWeight:'800',color:'#111827'},fieldMenu:{position:'absolute',right:72,width:190,borderWidth:2,borderColor:'#D1D5DB',borderRadius:14,backgroundColor:'#FFF',padding:6},fieldRow:{minHeight:48,flexDirection:'row',alignItems:'center',gap:9,paddingHorizontal:10},fieldText:{fontSize:13,fontWeight:'800',color:'#111827'},
   captureActions: { position: 'absolute', left: 16, right: 16, bottom: 88, flexDirection: 'row', gap: 8 },
   captureButton: { minHeight: 56, flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#047857', paddingHorizontal: 6 },
   captureText: { color: '#065F46', fontSize: 13, fontWeight: '900' },
