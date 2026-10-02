@@ -65,6 +65,10 @@ async function apply(item:OutboxQueueItem){
  } else if(item.tableName==='local_chat_messages' && item.action==='UPDATE'){
    mapped={};
    if(p.isPinned!==undefined)mapped.is_pinned=!!p.isPinned;
+   if(p.reactions!==undefined)mapped.reactions=p.reactions;
+   if(p.text!==undefined)mapped.text=p.text;
+   if(p.editedAt!==undefined)mapped.edited_at=p.editedAt;
+   if(p.deletedAt!==undefined)mapped.deleted_at=p.deletedAt;
  } else if(item.tableName==='junction_branches' && item.action==='UPDATE'){
    mapped={};
    if(p.status!==undefined)mapped.status=p.status;
