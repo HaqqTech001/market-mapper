@@ -12,7 +12,7 @@ export default function MoreScreen(){
   <Item title="Offline Data" sub="Pending sync, failed items and conflicts" onPress={()=>router.push('/offline-data')}/>
   <Item title="Revisits" sub="Work marked to verify or return to" onPress={()=>router.push('/revisits')}/>
   {user?.role==='team_lead'||user?.role==='admin'?<><Text style={s.section}>COORDINATION</Text><Item title="Team Coordination" sub="Assignments, handovers and remaining work" onPress={()=>router.push('/team-coordination')}/><Item title="Handovers" sub="Incoming and outgoing area transfers" onPress={()=>router.push('/handovers')}/><Item title="Field Issues" sub="Review reported operational issues" onPress={()=>router.push('/field-issues')}/></>:null}
-  {user?.role==='admin'?<><Text style={s.section}>ADMIN</Text><Item title="Admin Workspace" sub="Users · teams · missions · catalogue" onPress={()=>router.push('/admin-workspace')}/><Item title="Catalogue" sub="Categories, products, services and suggestions" onPress={()=>router.push('/catalogue-admin')}/></>:null}
+  {user?.role==='admin'?<><Text style={s.section}>ADMIN</Text><Item title="Admin Workspace" sub="Users · teams · mission operations · catalogue" onPress={()=>router.push('/admin-workspace')}/><Item title="Mission Operations" sub="Manage all missions, teams and assignments" onPress={()=>router.push('/admin-missions')}/><Item title="Catalogue" sub="Categories, products, services and suggestions" onPress={()=>router.push('/catalogue-admin')}/></>:null}
   <Text style={s.section}>ACCOUNT</Text><Pressable style={s.signout} onPress={async()=>{await nativeSupabase.auth.signOut();router.replace('/')}}><Text style={s.signoutText}>Sign Out</Text></Pressable>
  </ScrollView></ScreenSafeArea>
 }
