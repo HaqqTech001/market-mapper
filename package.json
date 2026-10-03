@@ -34,7 +34,13 @@
     "react-native-safe-area-context": "~5.6.0",
     "expo-document-picker": "~57.0.1",
     "expo-audio": "~57.0.1",
-    "tus-js-client": "^4.3.1"
+    "tus-js-client": "^4.3.1",
+    "@livekit/react-native": "^2.9.6",
+    "@livekit/react-native-expo-plugin": "^1.0.1",
+    "@livekit/react-native-webrtc": "^137.0.2",
+    "@config-plugins/react-native-webrtc": "^14.0.0",
+    "livekit-client": "^2.15.13",
+    "expo-dev-client": "~57.0.6"
   },
   "devDependencies": {
     "@types/react": "~19.2.4",
