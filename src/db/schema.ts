@@ -761,3 +761,10 @@ export const DDL_V7 = [
   `ALTER TABLE local_chat_messages ADD COLUMN edited_at TEXT;`,
   `ALTER TABLE local_chat_messages ADD COLUMN deleted_at TEXT;`
 ];
+
+
+// Native runtime compatibility: channel preferences used by cloud hydration.
+export const MIGRATION_VERSION_8 = 8;
+export const DDL_V8 = [
+  `ALTER TABLE local_chat_channels ADD COLUMN is_muted INTEGER NOT NULL DEFAULT 0;`,
+];
