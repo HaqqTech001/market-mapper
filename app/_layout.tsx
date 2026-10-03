@@ -7,6 +7,7 @@ import { initializeNativeDatabase } from '@/src/native/database';
 import { OperationalRealtimeLifecycle } from '@/src/native/OperationalRealtimeLifecycle';
 import { FieldBottomNav } from '@/src/native/FieldBottomNav';
 import { AuthGate } from '@/src/native/AuthGate';
+import { IncomingCallLifecycle } from '@/src/native/IncomingCallLifecycle';
 
 const CORE=['/','/map','/missions','/chat','/more'];
 
@@ -47,6 +48,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
     <AuthGate>
       <OperationalRealtimeLifecycle />
+      <IncomingCallLifecycle />
       <StatusBar style="dark" />
       <View style={{flex:1}}><Stack screenOptions={{ headerShown: false }} /></View>
       {CORE.includes(pathname) ? <FieldBottomNav /> : null}
