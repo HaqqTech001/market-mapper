@@ -272,6 +272,11 @@ export class ChatRepository {
     await OutboxRepository.enqueue('local_chat_message_receipts',messageId+'_'+userId,'INSERT',{messageId,userId,deliveredAt:now,readAt:null});
   }
 
+  static async getMessageReceipts(messageId:string):Promise<Array<{userId:string;name:string;role:UserRole;deliveredAt?:string;readAt?:string}>>{
+    const rows=await this.db.getAllAsync<any>(`SELECT r.user_id,r.delivered_at,r.read_at,p.full_name,p.role FROM local_chat_message_receipts r LEFT JOIN local_profiles p ON p.id=r.user_id WHERE r.message_id=? ORDER BY CASE WHEN r.read_at IS NOT NULL THEN 0 ELSE 1 END,COALESCE(r.read_at,r.delivered_at) DESC;`,[messageId]);
+    return rows.map(r=>({userId:r.user_id,name:r.full_name||'Team member',role:(r.role||'mapper') as UserRole,deliveredAt:r.delivered_at||undefined,readAt:r.read_at||undefined}));
+  }
+
   static async updateTransfer(messageId:string,status:string,progress:number):Promise<void>{
     await this.db.runAsync('UPDATE local_chat_messages SET transfer_status=?,transfer_progress=? WHERE id=?;',[status,Math.max(0,Math.min(1,progress)),messageId]);
   }
