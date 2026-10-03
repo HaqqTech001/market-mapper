@@ -34,6 +34,9 @@ export class ChatRepository {
         lastMessageSnippet: existing.last_message_snippet || existing.lastMessageSnippet,
         lastMessageTime: existing.last_message_time || existing.lastMessageTime,
         createdAt: existing.created_at || existing.createdAt,
+        description: existing.description || undefined,
+        avatarPath: existing.avatar_path || undefined,
+        updatedAt: existing.updated_at || undefined,
       };
     }
 
@@ -76,6 +79,9 @@ export class ChatRepository {
       lastMessageSnippet: r.last_message_snippet || r.lastMessageSnippet,
       lastMessageTime: r.last_message_time || r.lastMessageTime,
       createdAt: r.created_at || r.createdAt,
+      description: r.description || undefined,
+      avatarPath: r.avatar_path || undefined,
+      updatedAt: r.updated_at || undefined,
     }));
   }
 
@@ -117,6 +123,10 @@ export class ChatRepository {
         sharedLocation,
         createdAt: r.created_at || r.createdAt,
         syncStatus: r.sync_status || 'local_only',
+        deliveredAt: r.delivered_at || undefined,
+        readAt: r.read_at || undefined,
+        transferStatus: r.transfer_status || 'none',
+        transferProgress: Number(r.transfer_progress || 0),
       };
     });
   }
@@ -240,5 +250,26 @@ export class ChatRepository {
   static async getPinnedMessages(channelId: string): Promise<ChatMessage[]> {
     const msgs = await this.getMessages(channelId);
     return msgs.filter((m) => m.isPinned);
+  }
+  static async markChannelRead(channelId:string,userId:string):Promise<void>{
+    const now=new Date().toISOString();
+    const rows=await this.db.getAllAsync<any>('SELECT id,sender_id FROM local_chat_messages WHERE channel_id=?;',[channelId]);
+    for(const row of rows){
+      if(row.sender_id===userId)continue;
+      await this.db.runAsync('INSERT OR REPLACE INTO local_chat_message_receipts(message_id,user_id,delivered_at,read_at) VALUES(?,?,COALESCE((SELECT delivered_at FROM local_chat_message_receipts WHERE message_id=? AND user_id=?),?),?);',[row.id,userId,row.id,userId,now,now]);
+    }
+    await this.db.runAsync('UPDATE local_chat_channels SET unread_count=0 WHERE id=?;',[channelId]);
+  }
+
+  static async updateTransfer(messageId:string,status:string,progress:number):Promise<void>{
+    await this.db.runAsync('UPDATE local_chat_messages SET transfer_status=?,transfer_progress=? WHERE id=?;',[status,Math.max(0,Math.min(1,progress)),messageId]);
+  }
+
+  static async updateChannelInfo(channelId:string,input:{name?:string;description?:string;avatarPath?:string}):Promise<void>{
+    const now=new Date().toISOString();
+    const row=await this.db.getFirstAsync<any>('SELECT name,description,avatar_path FROM local_chat_channels WHERE id=?;',[channelId]);
+    if(!row)return;
+    await this.db.runAsync('UPDATE local_chat_channels SET name=?,description=?,avatar_path=?,updated_at=? WHERE id=?;',[input.name??row.name,input.description??row.description,input.avatarPath??row.avatar_path,now,channelId]);
+    await OutboxRepository.enqueue('local_chat_channels',channelId,'UPDATE',{id:channelId,...input,updatedAt:now});
   }
 }
