@@ -11,14 +11,19 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.haqqtech.marketmapper",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Market Mapper uses your location to capture businesses, places and market paths."
+        "NSLocationWhenInUseUsageDescription": "Market Mapper uses your location to capture businesses, places and market paths.",
+        "NSMicrophoneUsageDescription": "Market Mapper uses your microphone for voice notes and team audio/video calls.",
+        "NSCameraUsageDescription": "Market Mapper uses your camera for field photos and team video calls."
       }
     },
     "android": {
       "package": "com.haqqtech.marketmapper",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION",
+        "RECORD_AUDIO",
+        "CAMERA",
+        "MODIFY_AUDIO_SETTINGS"
       ]
     },
     "plugins": [
@@ -36,7 +41,8 @@
           "photosPermission": "Allow Market Mapper to select a field photo for a mapped business.",
           "cameraPermission": "Allow Market Mapper to take field photos for mapped businesses."
         }
-      ]
+      ],
+      "@livekit/react-native-expo-plugin"
     ],
     "experiments": {
       "typedRoutes": true
