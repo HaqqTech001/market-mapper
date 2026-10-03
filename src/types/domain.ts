@@ -789,6 +789,9 @@ export interface ChatChannel {
   lastMessageSnippet?: string;
   lastMessageTime?: string;
   createdAt: string;
+  description?: string;
+  avatarPath?: string;
+  updatedAt?: string;
 }
 
 export type ChatMessageType='text'|'image'|'video'|'audio'|'file';
@@ -821,6 +824,10 @@ export interface ChatMessage {
   };
   createdAt: string;
   syncStatus?: SyncStatus;
+  deliveredAt?: string;
+  readAt?: string;
+  transferStatus?: 'none'|'queued'|'uploading'|'downloading'|'complete'|'failed'|'cancelled';
+  transferProgress?: number;
 }
 
 export type NotificationType =
