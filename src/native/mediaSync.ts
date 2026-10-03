@@ -4,6 +4,8 @@ import { MediaUploadRepository } from '@/src/db/repositories/MediaUploadReposito
 import { getDatabase } from '@/src/db/sqlite';
 import type { MediaUploadQueueItem } from '@/src/types';
 
+const LEGACY_IN_MEMORY_UPLOAD_MAX_BYTES=25*1024*1024;
+
 function contentTypeFor(item: MediaUploadQueueItem) {
   if(item.mediaType && item.mediaType.includes('/')) return item.mediaType;
   const ext = item.localUri.split('.').pop()?.toLowerCase();
@@ -58,6 +60,7 @@ export async function uploadPendingMedia(limit = 10) {
       await MediaUploadRepository.updateStatus(job.id, 'uploading');
       const info = await FileSystem.getInfoAsync(job.localUri);
       if (!info.exists) throw new Error('LOCAL_MEDIA_FILE_MISSING');
+      if(typeof info.size==='number'&&info.size>LEGACY_IN_MEMORY_UPLOAD_MAX_BYTES) throw new Error('CHAT_MEDIA_REQUIRES_RESUMABLE_UPLOAD');
       const body = await uriToArrayBuffer(job.localUri);
       const { error } = await nativeSupabase.storage.from(job.bucket).upload(job.remotePath, body, { contentType: contentTypeFor(job), upsert: true });
       if (error) throw error;
