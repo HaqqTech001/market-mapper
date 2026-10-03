@@ -1,6 +1,7 @@
 import type { PropsWithChildren } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MarketMapperLogo } from './MarketMapperLogo';
 
 export function AuthScreenShell({ title, subtitle, children }: PropsWithChildren<{ title: string; subtitle: string }>) {
   const insets = useSafeAreaInsets();
@@ -12,7 +13,7 @@ export function AuthScreenShell({ title, subtitle, children }: PropsWithChildren
         automaticallyAdjustKeyboardInsets
         contentContainerStyle={[s.body,{paddingBottom:Math.max(24,insets.bottom+16)}]}
       >
-        <View style={s.brand}><Text style={s.eyebrow}>MARKET MAPPER</Text><Text style={s.brandText}>Field Operations</Text></View>
+        <View style={s.brand}><MarketMapperLogo size={58} showName/><Text style={s.brandText}>Field Operations</Text></View>
         <View style={s.card}><Text style={s.title}>{title}</Text><Text style={s.subtitle}>{subtitle}</Text>{children}</View>
       </ScrollView>
     </KeyboardAvoidingView>
