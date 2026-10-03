@@ -17,6 +17,7 @@ export function chatUserMessage(error:unknown, fallback='Something went wrong. P
   const text=raw.toLowerCase();
   if(text.includes('network')||text.includes('fetch')||text.includes('offline'))return 'You appear to be offline. Your chat is still available on this device.';
   if(text.includes('permission')||text.includes('not authorized')||text.includes('row-level security')||text.includes('rls'))return 'You do not have permission to do that in this chat.';
+  if(text.includes('chat_media_requires_resumable_upload'))return 'This file is ready on your device, but it needs the large-file uploader before it can be sent. Smaller files can send normally.';
   if(text.includes('storage')||text.includes('upload'))return 'The media could not be uploaded. Keep it on this device and try again when your connection is stable.';
   if(text.includes('too large')||text.includes('payload'))return `That file is too large. The maximum attachment size is ${CHAT_MAX_ATTACHMENT_LABEL}.`;
   return fallback;
