@@ -35,6 +35,10 @@ async function apply(item:OutboxQueueItem){
    const {data:profile}=user?await nativeSupabase.from('profiles').select('role').eq('id',user.id).single():{data:null};
    if(profile?.role!=='admin')throw new Error('NOTIFICATION_INSERT_REQUIRES_PRIVILEGED_FLOW');
  }
+ if(item.tableName==='local_chat_message_receipts'){
+   const mapped={message_id:p.messageId,user_id:p.userId,delivered_at:p.deliveredAt||null,read_at:p.readAt||null};
+   const {error}=await nativeSupabase.from('chat_message_receipts').upsert(mapped,{onConflict:'message_id,user_id'});if(error)throw error;return;
+ }
  if(item.tableName==='businesses'){
    const offerings=p.offerings||[]; const business=mapBusiness(p);
    const {error}=await nativeSupabase.from('businesses').upsert(business,{onConflict:'id'}); if(error)throw error;
