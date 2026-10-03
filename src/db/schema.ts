@@ -768,3 +768,18 @@ export const MIGRATION_VERSION_8 = 8;
 export const DDL_V8 = [
   `ALTER TABLE local_chat_channels ADD COLUMN is_muted INTEGER NOT NULL DEFAULT 0;`,
 ];
+
+
+// Native messenger metadata, receipts and transfer state.
+export const MIGRATION_VERSION_9 = 9;
+export const DDL_V9 = [
+  `ALTER TABLE local_chat_channels ADD COLUMN description TEXT;`,
+  `ALTER TABLE local_chat_channels ADD COLUMN avatar_path TEXT;`,
+  `ALTER TABLE local_chat_channels ADD COLUMN updated_at TEXT;`,
+  `ALTER TABLE local_chat_messages ADD COLUMN delivered_at TEXT;`,
+  `ALTER TABLE local_chat_messages ADD COLUMN read_at TEXT;`,
+  `ALTER TABLE local_chat_messages ADD COLUMN transfer_status TEXT NOT NULL DEFAULT 'none';`,
+  `ALTER TABLE local_chat_messages ADD COLUMN transfer_progress REAL NOT NULL DEFAULT 0;`,
+  `CREATE TABLE IF NOT EXISTS local_chat_message_receipts (message_id TEXT NOT NULL, user_id TEXT NOT NULL, delivered_at TEXT, read_at TEXT, PRIMARY KEY(message_id,user_id));`,
+  `CREATE INDEX IF NOT EXISTS idx_chat_receipts_message ON local_chat_message_receipts(message_id);`,
+];
