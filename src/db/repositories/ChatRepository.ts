@@ -259,6 +259,17 @@ export class ChatRepository {
       await this.db.runAsync('INSERT OR REPLACE INTO local_chat_message_receipts(message_id,user_id,delivered_at,read_at) VALUES(?,?,COALESCE((SELECT delivered_at FROM local_chat_message_receipts WHERE message_id=? AND user_id=?),?),?);',[row.id,userId,row.id,userId,now,now]);
     }
     await this.db.runAsync('UPDATE local_chat_channels SET unread_count=0 WHERE id=?;',[channelId]);
+    for(const row of rows){
+      if(row.sender_id===userId)continue;
+      await OutboxRepository.enqueue('local_chat_message_receipts',row.id+'_'+userId,'INSERT',{messageId:row.id,userId,deliveredAt:now,readAt:now});
+    }
+  }
+
+  static async markDelivered(messageId:string,userId:string):Promise<void>{
+    const now=new Date().toISOString();
+    await this.db.runAsync('INSERT OR IGNORE INTO local_chat_message_receipts(message_id,user_id,delivered_at,read_at) VALUES(?,?,?,NULL);',[messageId,userId,now]);
+    await this.db.runAsync('UPDATE local_chat_message_receipts SET delivered_at=COALESCE(delivered_at,?) WHERE message_id=? AND user_id=?;',[now,messageId,userId]);
+    await OutboxRepository.enqueue('local_chat_message_receipts',messageId+'_'+userId,'INSERT',{messageId,userId,deliveredAt:now,readAt:null});
   }
 
   static async updateTransfer(messageId:string,status:string,progress:number):Promise<void>{
