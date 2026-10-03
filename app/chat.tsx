@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ScreenSafeArea, ScreenHeader } from '@/src/native/ScreenScaffold';
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect } from 'expo-router';
@@ -13,13 +13,14 @@ import { chooseChatFile, stageChatAttachment } from '@/src/native/chatMedia';
 import { MediaUploadRepository } from '@/src/db/repositories/MediaUploadRepository';
 import { nativeSupabase } from '@/src/native/supabase';
 import * as Linking from 'expo-linking';
+import * as FileSystem from 'expo-file-system/legacy';
 
 export default function ChatScreen(){
  const [user,setUser]=useState<NativeUserContext|null>(null); const [channels,setChannels]=useState<ChatChannel[]>([]); const [active,setActive]=useState<ChatChannel|null>(null); const [messages,setMessages]=useState<ChatMessage[]>([]); const [text,setText]=useState(''); const [loading,setLoading]=useState(true);
  const loadChannels=useCallback(async()=>{const all=await ChatRepository.getAllChannels();setChannels(all);if(active){setMessages(await ChatRepository.getMessages(active.id))}},[active]);
  useFocusEffect(useCallback(()=>{loadChannels();return subscribeOperationalData(()=>{loadChannels()})},[loadChannels]));
  useEffect(()=>{let mounted=true;(async()=>{try{const u=await requireNativeUserContext();if(!mounted)return;setUser(u);await ChatRepository.getOrCreateChannel('General Chat','general');const missions=await getAssignedNativeMissions(u.userId);for(const m of missions)await ChatRepository.getOrCreateChannel(m.title+' Comms','mission',undefined,m.id);await loadChannels()}finally{if(mounted)setLoading(false)}})();return()=>{mounted=false}},[]);
- const openAttachment=async(m:ChatMessage)=>{const a=m.attachment;if(!a)return;if(a.localUri){await Linking.openURL(a.localUri);return}if(a.remotePath){const {data,error}=await nativeSupabase.storage.from('field-media').createSignedUrl(a.remotePath,300);if(error){Alert.alert('Could not open attachment',error.message);return}await Linking.openURL(data.signedUrl)}};
+ const openAttachment=async(m:ChatMessage)=>{const a=m.attachment;if(!a)return;try{if(a.localUri){const uri=Platform.OS==='android'&&a.localUri.startsWith('file:')?await FileSystem.getContentUriAsync(a.localUri):a.localUri;await Linking.openURL(uri);return}if(a.remotePath){const {data,error}=await nativeSupabase.storage.from('field-media').createSignedUrl(a.remotePath,300);if(error)throw error;await Linking.openURL(data.signedUrl)}}catch(error){Alert.alert('Could not open attachment',error instanceof Error?error.message:'No compatible app could open this attachment.')}};
  const open=async(c:ChatChannel)=>{setActive(c);setMessages(await ChatRepository.getMessages(c.id))};
  const send=async()=>{if(!user||!active||!text.trim())return;const body=text.trim();setText('');await ChatRepository.sendMessage({channelId:active.id,senderId:user.userId,senderName:user.fullName,senderRole:user.role,text:body,messageType:'text'});setMessages(await ChatRepository.getMessages(active.id));runNativeSync().catch(()=>{})};
  const sendFile=async()=>{if(!user||!active)return;const picked=await chooseChatFile();if(!picked)return;const id='msg_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);await stageChatAttachment({messageId:id,senderId:user.userId,attachment:picked.attachment,type:picked.type});await ChatRepository.sendMessage({id,channelId:active.id,senderId:user.userId,senderName:user.fullName,senderRole:user.role,text:'',messageType:picked.type,attachment:picked.attachment});const ext=(picked.attachment.name.split('.').pop()||'bin').replace(/[^a-z0-9]/gi,'').toLowerCase()||'bin';await MediaUploadRepository.enqueue({localUri:picked.attachment.localUri!,bucket:'field-media',remotePath:user.userId+'/chat/'+id+'/attachment.'+ext,entityType:'chat',entityId:id,mediaType:picked.attachment.mimeType||picked.type});setMessages(await ChatRepository.getMessages(active.id));runNativeSync().catch(()=>{})};
