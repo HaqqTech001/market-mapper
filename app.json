@@ -42,8 +42,7 @@
           "cameraPermission": "Allow Market Mapper to take field photos for mapped businesses."
         }
       ],
-      "@livekit/react-native-expo-plugin",
-      "@config-plugins/react-native-webrtc"
+      "@livekit/react-native-expo-plugin"
     ],
     "experiments": {
       "typedRoutes": true
