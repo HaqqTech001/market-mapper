@@ -8,6 +8,9 @@ import { OperationalRealtimeLifecycle } from '@/src/native/OperationalRealtimeLi
 import { FieldBottomNav } from '@/src/native/FieldBottomNav';
 import { AuthGate } from '@/src/native/AuthGate';
 import { IncomingCallLifecycle } from '@/src/native/IncomingCallLifecycle';
+import { registerGlobals } from '@livekit/react-native';
+
+registerGlobals();
 
 const CORE=['/','/map','/missions','/chat','/more'];
 
