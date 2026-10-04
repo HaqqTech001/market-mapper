@@ -1,70 +1,235 @@
 import React from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
-import { Button } from '../../components/ui';
-import { MapPin, ShieldCheck, WifiOff } from 'lucide-react';
 
 export const SplashScreen: React.FC = () => {
   const { navigateTo, dbReady, dbStats } = useApp();
 
   return (
-    <div className="min-h-screen w-full bg-emerald-800 text-white flex flex-col justify-between p-6 sm:p-10 select-none">
-      {/* Top Brand Marker */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center font-bold">
-            MM
-          </div>
-          <span className="text-xs font-bold tracking-wider text-emerald-200 uppercase">
-            Market Mapper V1
-          </span>
-        </div>
-        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/10 text-emerald-100 border border-white/15">
-          Local SQLite Ready
-        </span>
-      </div>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <View style={styles.topRow}>
+          <View style={styles.brandRow}>
+            <View style={styles.brandMark}>
+              <Text style={styles.brandMarkText}>MM</Text>
+            </View>
+            <Text style={styles.brandText}>MARKET MAPPER V1</Text>
+          </View>
 
-      {/* Hero Body */}
-      <div className="max-w-md mx-auto text-center my-auto py-12">
-        <div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-white text-emerald-800 flex items-center justify-center shadow-xl">
-          <MapPin className="w-10 h-10 text-emerald-700" />
-        </div>
+          <View style={styles.readyBadge}>
+            <Text style={styles.readyBadgeText}>Local SQLite Ready</Text>
+          </View>
+        </View>
 
-        <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white">
-          Market Mapper
-        </h1>
-        <p className="text-emerald-100/90 text-sm mt-3 leading-relaxed">
-          Offline-first field data collection for informal markets, corridor footpaths, and trader inventory.
-        </p>
+        <View style={styles.hero}>
+          <View style={styles.iconBox}>
+            <Ionicons name="location" size={42} color="#047857" />
+          </View>
 
-        {/* Local Storage Indicator */}
-        <div className="mt-8 p-3.5 bg-white/10 backdrop-blur-md rounded-2xl border border-white/15 text-left text-xs">
-          <div className="flex items-center gap-2 font-bold text-white mb-1.5">
-            <ShieldCheck className="w-4 h-4 text-emerald-300" />
-            <span>SQLite Offline Engine Active</span>
-          </div>
-          <p className="text-emerald-100/80 text-[11px]">
-            {dbReady
-              ? `Embedded database initialized (${dbStats.totalTables} tables, Nigerian catalogue ready). Field mappings store locally first.`
-              : 'Initializing local database schema and reference catalogue...'}
-          </p>
-        </div>
-      </div>
+          <Text style={styles.title}>Market Mapper</Text>
+          <Text style={styles.subtitle}>
+            Offline-first field data collection for informal markets, corridor
+            footpaths, and trader inventory.
+          </Text>
 
-      {/* Bottom Action */}
-      <div className="max-w-md mx-auto w-full space-y-3">
-        <Button
-          variant="secondary"
-          size="lg"
-          fullWidth
-          onClick={() => navigateTo('sign_in')}
-          className="bg-white text-emerald-900 hover:bg-emerald-50 font-bold"
-        >
-          Sign In to Mission
-        </Button>
-        <p className="text-center text-[11px] text-emerald-200/80">
-          Operates seamlessly without active cellular or internet connection
-        </p>
-      </div>
-    </div>
+          <View style={styles.storageCard}>
+            <View style={styles.storageTitleRow}>
+              <Ionicons name="shield-checkmark" size={18} color="#6ee7b7" />
+              <Text style={styles.storageTitle}>SQLite Offline Engine Active</Text>
+            </View>
+            <Text style={styles.storageText}>
+              {dbReady
+                ? `Embedded database initialized (${dbStats.totalTables} tables, Nigerian catalogue ready). Field mappings store locally first.`
+                : 'Initializing local database schema and reference catalogue...'}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.bottom}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Sign in to mission"
+            disabled={!dbReady}
+            onPress={() => navigateTo('sign_in')}
+            style={({ pressed }) => [
+              styles.signInButton,
+              pressed && dbReady && styles.signInButtonPressed,
+              !dbReady && styles.signInButtonDisabled,
+            ]}
+          >
+            {!dbReady && <ActivityIndicator size="small" color="#064e3b" />}
+            <Text style={styles.signInButtonText}>
+              {dbReady ? 'Sign In to Mission' : 'Preparing Offline Database...'}
+            </Text>
+          </Pressable>
+
+          <Text style={styles.footerText}>
+            Operates seamlessly without active cellular or internet connection
+          </Text>
+        </View>
+      </View>
+    </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#065f46',
+  },
+  container: {
+    flex: 1,
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    backgroundColor: '#065f46',
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 1,
+    gap: 8,
+  },
+  brandMark: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.10)',
+  },
+  brandMarkText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  brandText: {
+    color: '#a7f3d0',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  readyBadge: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  readyBadgeText: {
+    color: '#d1fae5',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  hero: {
+    width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  iconBox: {
+    width: 80,
+    height: 80,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    marginBottom: 24,
+    elevation: 8,
+    shadowColor: '#000000',
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  title: {
+    color: '#ffffff',
+    fontSize: 34,
+    lineHeight: 40,
+    fontWeight: '900',
+    letterSpacing: -0.8,
+    textAlign: 'center',
+  },
+  subtitle: {
+    marginTop: 12,
+    color: '#d1fae5',
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: 'center',
+  },
+  storageCard: {
+    width: '100%',
+    marginTop: 30,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(255,255,255,0.10)',
+  },
+  storageTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 7,
+  },
+  storageTitle: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  storageText: {
+    color: '#d1fae5',
+    fontSize: 11,
+    lineHeight: 17,
+  },
+  bottom: {
+    width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
+    gap: 12,
+  },
+  signInButton: {
+    minHeight: 52,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 9,
+    paddingHorizontal: 18,
+    backgroundColor: '#ffffff',
+  },
+  signInButtonPressed: {
+    opacity: 0.9,
+    transform: [{ scale: 0.99 }],
+  },
+  signInButtonDisabled: {
+    opacity: 0.72,
+  },
+  signInButtonText: {
+    color: '#064e3b',
+    fontSize: 16,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  footerText: {
+    color: '#a7f3d0',
+    fontSize: 11,
+    lineHeight: 16,
+    textAlign: 'center',
+  },
+});
