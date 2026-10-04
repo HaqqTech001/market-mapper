@@ -33,7 +33,6 @@ export async function createAdminMission(input:{title:string;marketName:string;d
   market_id:marketId,
   market_name:marketName,
   description:input.description?.trim()||null,
-  instructions:input.description?.trim()||null,
   mission_type:input.type||'initial_mapping',
   status:'draft',
   created_by:admin.userId,
