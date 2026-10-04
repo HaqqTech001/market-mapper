@@ -21,7 +21,6 @@ import { VoiceNoteRecorder, type VoiceNoteResult } from '@/src/native/VoiceNoteR
 import { VoiceNotePlayer } from '@/src/native/VoiceNotePlayer';
 import { downloadChatAttachment, cancelChatDownload, subscribeChatDownload } from '@/src/native/chatDownloads';
 import { MessageInfo } from '@/src/native/MessageInfo';
-import { downloadChatAttachment } from '@/src/native/chatDownloads';
 
 export default function ChatScreen(){
  const [user,setUser]=useState<NativeUserContext|null>(null); const [channels,setChannels]=useState<ChatChannel[]>([]); const [active,setActive]=useState<ChatChannel|null>(null); const [messages,setMessages]=useState<ChatMessage[]>([]); const [text,setText]=useState(''); const [loading,setLoading]=useState(true); const [emoji,setEmoji]=useState(false); const [attach,setAttach]=useState(false); const [info,setInfo]=useState(false); const [reply,setReply]=useState<ChatMessage|null>(null); const [downloadState,setDownloadState]=useState<Record<string,{status:string;progress:number}>>({}); const [reactionTarget,setReactionTarget]=useState<ChatMessage|null>(null); const [infoMessage,setInfoMessage]=useState<ChatMessage|null>(null); const [receiptRows,setReceiptRows]=useState<Awaited<ReturnType<typeof ChatRepository.getMessageReceipts>>>([]); const scroll=useRef<ScrollView>(null);
