@@ -288,4 +288,23 @@ export class ChatRepository {
     await this.db.runAsync('UPDATE local_chat_channels SET name=?,description=?,avatar_path=?,updated_at=? WHERE id=?;',[input.name??row.name,input.description??row.description,input.avatarPath??row.avatar_path,now,channelId]);
     await OutboxRepository.enqueue('local_chat_channels',channelId,'UPDATE',{id:channelId,...input,updatedAt:now});
   }
+  static async getChannelParticipants(channel:ChatChannel):Promise<Array<{id:string;name:string;role:UserRole}>>{
+    if(channel.missionId){
+      const rows=await this.db.getAllAsync<any>(`SELECT mm.user_id,p.full_name,p.role FROM local_mission_members mm LEFT JOIN local_profiles p ON p.id=mm.user_id WHERE mm.mission_id=? ORDER BY p.full_name;`,[channel.missionId]);
+      return rows.map(r=>({id:r.user_id,name:r.full_name||r.user_name||'Team member',role:(r.role||'mapper') as UserRole}));
+    }
+    const rows=await this.db.getAllAsync<any>(`SELECT DISTINCT m.sender_id AS id,COALESCE(p.full_name,m.sender_name) AS name,COALESCE(p.role,m.sender_role,'mapper') AS role FROM local_chat_messages m LEFT JOIN local_profiles p ON p.id=m.sender_id WHERE m.channel_id=? ORDER BY name;`,[channel.id]);
+    return rows.map(r=>({id:r.id,name:r.name||'Team member',role:(r.role||'mapper') as UserRole}));
+  }
+
+  static async getMessageReceiptState(messageId:string,channel:ChatChannel,senderId:string):Promise<'sent'|'delivered'|'read'>{
+    const participants=(await this.getChannelParticipants(channel)).filter(p=>p.id!==senderId);
+    if(!participants.length)return 'sent';
+    const receipts=await this.getMessageReceipts(messageId);
+    const byUser=new Map(receipts.map(r=>[r.userId,r]));
+    if(participants.every(p=>Boolean(byUser.get(p.id)?.readAt)))return 'read';
+    if(participants.every(p=>Boolean(byUser.get(p.id)?.deliveredAt)))return 'delivered';
+    return 'sent';
+  }
+
 }
