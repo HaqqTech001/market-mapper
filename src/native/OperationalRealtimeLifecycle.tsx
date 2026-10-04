@@ -4,11 +4,14 @@ import { nativeSupabase } from './supabase';
 import { getAssignedNativeMissions, requireNativeUserContext } from './userContext';
 import { startOperationalRealtime, stopOperationalRealtime } from './operationalRealtime';
 import { hydrateOperationalMessaging } from './operationalHydration';
+import { initializeOperationalNotifications, installOperationalNotificationNavigation } from './notificationDelivery';
 
 export function OperationalRealtimeLifecycle(){
  useEffect(()=>{
   let alive=true;
   let generation=0;
+  const removeNotificationNavigation=installOperationalNotificationNavigation();
+  initializeOperationalNotifications().catch(error=>console.warn('Notification initialization unavailable',error));
   const start=async()=>{
    const mine=++generation;
    await stopOperationalRealtime();
@@ -27,7 +30,7 @@ export function OperationalRealtimeLifecycle(){
   };
   start();
   const {data}=nativeSupabase.auth.onAuthStateChange(()=>{start()});
-  return()=>{alive=false;generation++;data.subscription.unsubscribe();stopOperationalRealtime().catch(()=>{})};
+  return()=>{alive=false;generation++;removeNotificationNavigation();data.subscription.unsubscribe();stopOperationalRealtime().catch(()=>{})};
  },[]);
  return null;
 }
