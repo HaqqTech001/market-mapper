@@ -2,6 +2,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { nativeSupabase } from './supabase';
 import { getDatabase } from '@/src/db/sqlite';
 import { emitOperationalDataChanged } from './operationalEvents';
+import { presentOperationalNotification } from './notificationDelivery';
 
 let channels: RealtimeChannel[] = [];
 
@@ -17,7 +18,10 @@ export async function startOperationalRealtime(userId:string, missionIds:string[
  const notification=nativeSupabase.channel('notifications:'+userId)
   .on('postgres_changes',{event:'*',schema:'public',table:'notifications',filter:'recipient_id=eq.'+userId},async payload=>{
    const p:any=payload.new;
-   if(p?.id) await db.runAsync("INSERT OR REPLACE INTO local_notifications (id,recipient_id,type,title,body,entity_reference_type,entity_reference_id,is_read,created_at) VALUES (?,?,?,?,?,?,?,?,?);",[p.id,p.recipient_id,p.type,p.title,p.body,p.entity_reference_type||null,p.entity_reference_id||null,p.is_read?1:0,p.created_at]);
+   if(p?.id) {
+    await db.runAsync("INSERT OR REPLACE INTO local_notifications (id,recipient_id,type,title,body,entity_reference_type,entity_reference_id,is_read,created_at) VALUES (?,?,?,?,?,?,?,?,?);",[p.id,p.recipient_id,p.type,p.title,p.body,p.entity_reference_type||null,p.entity_reference_id||null,p.is_read?1:0,p.created_at]);
+    if(payload.eventType==='INSERT') await presentOperationalNotification({id:p.id,type:p.type,title:p.title,body:p.body,entityReferenceType:p.entity_reference_type,entityReferenceId:p.entity_reference_id}).catch(error=>console.warn('Notification presentation failed',error));
+   }
    emitOperationalDataChanged(); onChange?.();
   }).subscribe();
  channels.push(notification);
