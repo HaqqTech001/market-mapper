@@ -62,7 +62,46 @@ export async function createAdminMission(input:{title:string;marketName:string;d
  throw new Error('Mission could not be created because the deployed missions schema is incompatible with the app.');
 }
 
-export async function getAdminMission(id:string){await requireAdmin();const {data,error}=await nativeSupabase.from('missions').select('id,title,description,instructions,status,mission_type,priority,market_id,market_name,assigned_starting_lat,assigned_starting_lng,created_at,mission_members(user_id,role,profiles!mission_members_user_id_fkey(full_name,email)),mission_area_assignments(area_id,area_name,assigned_to_user_id,status,notes,profiles!mission_area_assignments_assigned_to_user_id_fkey(full_name))').eq('id',id).single();if(error)throw error;return data}
+export async function getAdminMission(id:string){
+ await requireAdmin();
+
+ // Load the Phase-2 core first. Optional/newer mission columns must not make
+ // the entire detail screen unavailable on installations awaiting migrations.
+ const {data:mission,error:missionError}=await nativeSupabase
+  .from('missions')
+  .select('id,title,description,status,created_at')
+  .eq('id',id)
+  .single();
+ if(missionError)throw missionError;
+
+ const [membersResult,areasResult]=await Promise.all([
+  nativeSupabase.from('mission_members')
+   .select('user_id,role,profiles!mission_members_user_id_fkey(full_name,email)')
+   .eq('mission_id',id),
+  nativeSupabase.from('mission_area_assignments')
+   .select('id,user_id,boundary_geojson')
+   .eq('mission_id',id)
+ ]);
+
+ if(membersResult.error)throw membersResult.error;
+ if(areasResult.error)throw areasResult.error;
+
+ // Normalize old Phase-2 area rows to the shape expected by the native UI.
+ const areas=(areasResult.data||[]).map((a:any)=>({
+  ...a,
+  area_id:a.area_id||String(a.id),
+  area_name:a.area_name||'Assigned area',
+  assigned_to_user_id:a.assigned_to_user_id||a.user_id,
+  status:a.status||'assigned',
+  notes:a.notes||null
+ }));
+
+ return {
+  ...mission,
+  mission_members:membersResult.data||[],
+  mission_area_assignments:areas
+ };
+}
 export async function addAdminMissionMember(missionId:string,userId:string,role:'mapper'|'team_lead'='mapper'){await requireAdmin();const {error}=await nativeSupabase.from('mission_members').upsert({mission_id:missionId,user_id:userId,role},{onConflict:'mission_id,user_id'});if(error)throw error}
 export async function removeAdminMissionMember(missionId:string,userId:string){await requireAdmin();const {error}=await nativeSupabase.from('mission_members').delete().eq('mission_id',missionId).eq('user_id',userId);if(error)throw error}
 export async function addAdminMissionArea(input:{missionId:string;areaName:string;userId:string;notes?:string}){await requireAdmin();const id='area_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);const {error}=await nativeSupabase.from('mission_area_assignments').insert({mission_id:input.missionId,user_id:input.userId,assigned_to_user_id:input.userId,area_id:id,area_name:input.areaName.trim(),notes:input.notes?.trim()||null,status:'assigned'});if(error)throw error}
