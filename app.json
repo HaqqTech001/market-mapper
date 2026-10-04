@@ -23,29 +23,18 @@
         "ACCESS_FINE_LOCATION",
         "RECORD_AUDIO",
         "CAMERA",
-        "MODIFY_AUDIO_SETTINGS"
+        "MODIFY_AUDIO_SETTINGS",
+        "POST_NOTIFICATIONS"
       ]
     },
     "plugins": [
       "expo-router",
-      [
-        "expo-location",
-        {
-          "locationWhenInUsePermission": "Allow Market Mapper to use your location while mapping markets."
-        }
-      ],
+      ["expo-location", {"locationWhenInUsePermission": "Allow Market Mapper to use your location while mapping markets."}],
       "expo-secure-store",
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "Allow Market Mapper to select a field photo for a mapped business.",
-          "cameraPermission": "Allow Market Mapper to take field photos for mapped businesses."
-        }
-      ],
-      "@livekit/react-native-expo-plugin"
+      ["expo-image-picker", {"photosPermission": "Allow Market Mapper to select a field photo for a mapped business.", "cameraPermission": "Allow Market Mapper to take field photos for mapped businesses."}],
+      "@livekit/react-native-expo-plugin",
+      "expo-notifications"
     ],
-    "experiments": {
-      "typedRoutes": true
-    }
+    "experiments": {"typedRoutes": true}
   }
 }
