@@ -844,7 +844,10 @@ export type NotificationType =
   | 'reconciliation_review'
   | 'sync_conflict'
   | 'catalogue_update'
-  | 'mission_completed';
+  | 'mission_completed'
+  | 'mission_status_changed'
+  | 'role_changed'
+  | 'account_status_changed';
 
 export interface NotificationItem {
   id: string;
