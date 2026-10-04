@@ -13,7 +13,7 @@ export default function NotificationsScreen(){
  const load=useCallback(async()=>{if(user)setItems(await NotificationRepository.getNotificationsForUser(user.userId))},[user]);
  useFocusEffect(useCallback(()=>{load();return subscribeOperationalData(()=>{load()})},[load]));
  useEffect(()=>{let mounted=true;(async()=>{try{const u=await requireNativeUserContext();if(!mounted)return;setUser(u);setItems(await NotificationRepository.getNotificationsForUser(u.userId))}finally{if(mounted)setLoading(false)}})();return()=>{mounted=false}},[]);
- const open=async(n:NotificationItem)=>{if(!n.isRead){await NotificationRepository.markAsRead(n.id);await load();runNativeSync().catch(()=>{})}const t=n.entityReferenceType;if(t==='mission')router.push('/missions');else if(['business','path','junction','place','field_issue'].includes(String(t)))router.push('/map')};
+ const open=async(n:NotificationItem)=>{if(!n.isRead){await NotificationRepository.markAsRead(n.id);await load();runNativeSync().catch(()=>{})}const t=n.entityReferenceType;if(t==='mission'&&n.entityReferenceId)router.push({pathname:'/mission-detail',params:{missionId:n.entityReferenceId}});else if(t==='mission'||t==='assignment')router.push('/missions');else if(t==='chat')router.push('/chat');else if(t==='profile'||t==='account')router.push('/more');else if(['business','path','junction','place','field_issue','issue'].includes(String(t)))router.push('/map')};
  const markAll=async()=>{if(!user)return;await NotificationRepository.markAllAsRead(user.userId);await load();runNativeSync().catch(()=>{})};
  if(loading)return <View style={s.center}><ActivityIndicator/><Text style={s.help}>Loading notifications…</Text></View>;
  const unread=items.filter(x=>!x.isRead).length;
