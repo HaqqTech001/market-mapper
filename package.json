@@ -39,7 +39,8 @@
     "@livekit/react-native-expo-plugin": "^1.0.1",
     "@livekit/react-native-webrtc": "144.1.2",
     "livekit-client": "^2.20.1",
-    "expo-dev-client": "~57.0.6"
+    "expo-dev-client": "~57.0.6",
+    "expo-video": "~57.0.5"
   },
   "devDependencies": {
     "@types/react": "~19.2.4",
