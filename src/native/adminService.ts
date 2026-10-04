@@ -24,26 +24,42 @@ export async function createAdminMission(input:{title:string;marketName:string;d
  const marketName=input.marketName.trim();
  if(!title||!marketName)throw new Error('Mission title and market are required.');
 
- // The cloud schema stores mission market_id as UUID. Until the dedicated cloud
- // markets registry lands, generate a stable UUID for this mission's market
- // context instead of leaving market_id null.
  const marketId=globalThis.crypto?.randomUUID?.() ?? '00000000-0000-4000-8000-'+Date.now().toString().padStart(12,'0').slice(-12);
- const {data,error}=await nativeSupabase.from('missions').insert({
+ const modernPayload:Record<string,unknown>={
   title,
   market_id:marketId,
   market_name:marketName,
   description:input.description?.trim()||null,
+  instructions:input.description?.trim()||null,
   mission_type:input.type||'initial_mapping',
   status:'draft',
   created_by:admin.userId,
   created_at:now,
   updated_at:now
- }).select('id').single();
- if(error){
+ };
+
+ let payload={...modernPayload};
+ // A number of installations still have the original Phase-2 missions table.
+ // PGRST204 tells us exactly which newer column is absent. Remove only that
+ // unsupported column and retry, so mission creation works across both schema
+ // generations while retaining every field the deployed database supports.
+ for(let attempt=0;attempt<8;attempt++){
+  const {data,error}=await nativeSupabase.from('missions').insert(payload).select('id').single();
+  if(!error)return data;
+
+  const missing=error.code==='PGRST204'
+   ? error.message.match(/Could not find the '([^']+)' column/)?.[1]
+   : undefined;
+  if(missing && Object.prototype.hasOwnProperty.call(payload,missing)){
+   console.warn('Mission schema compatibility: retrying without unavailable column',missing);
+   delete payload[missing];
+   continue;
+  }
+
   console.error('Mission creation failed',{code:error.code,message:error.message,details:error.details,hint:error.hint});
   throw new Error(error.message||'Mission could not be created.');
  }
- return data;
+ throw new Error('Mission could not be created because the deployed missions schema is incompatible with the app.');
 }
 
 export async function getAdminMission(id:string){await requireAdmin();const {data,error}=await nativeSupabase.from('missions').select('id,title,description,instructions,status,mission_type,priority,market_id,market_name,assigned_starting_lat,assigned_starting_lng,created_at,mission_members(user_id,role,profiles!mission_members_user_id_fkey(full_name,email)),mission_area_assignments(area_id,area_name,assigned_to_user_id,status,notes,profiles!mission_area_assignments_assigned_to_user_id_fkey(full_name))').eq('id',id).single();if(error)throw error;return data}
