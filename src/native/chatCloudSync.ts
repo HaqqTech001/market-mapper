@@ -37,18 +37,9 @@ export async function hydrateChatFromCloud(): Promise<{channels:number;messages:
     channelIdMap.set(c.id,canonical?.id||c.id);
   }
 
-  // Remove stale local duplicates only after redirecting their cached messages.
-  for(const [missionId,canonical] of canonicalByMission){
-    const duplicates=await db.getAllAsync<any>(
-      "SELECT id FROM local_chat_channels WHERE channel_type='mission' AND mission_id=? AND id<>?;",
-      [missionId,canonical.id]
-    );
-    for(const duplicate of duplicates){
-      await db.runAsync('UPDATE local_chat_messages SET channel_id=? WHERE channel_id=?;',[canonical.id,duplicate.id]);
-      await db.runAsync('DELETE FROM local_chat_channels WHERE id=?;',[duplicate.id]);
-      await db.runAsync("DELETE FROM local_outbox_queue WHERE table_name='local_chat_channels' AND record_id=?;",[duplicate.id]);
-    }
-  }
+  // Never delete a local channel during hydration. It may contain messages that
+  // have not reached Supabase yet. Duplicate cleanup belongs to explicit mission
+  // deletion/repair, not the read path.
 
   const canonicalChannels=(channels||[]).filter(c=>!c.mission_id || canonicalByMission.get(c.mission_id)?.id===c.id);
   for(const c of canonicalChannels){
