@@ -170,7 +170,7 @@ export default function MapScreen() {
 
   return (
     <View style={styles.screen}>
-      <NativeFieldMap ref={mapRef} currentLocation={current} path={path} mapType={mapType} mappingMode />
+      <NativeFieldMap ref={mapRef} currentLocation={current} path={path} mapType={mapType} />
       <View style={[styles.hud,{top:Math.max(10,insets.top+6)}]}>
         <Text style={styles.missionText}>{mission ? mission.title : 'No assigned mission'}</Text>
         <View style={styles.hudTop}>
@@ -265,7 +265,7 @@ const formatDistance = (meters: number) => meters >= 1000 ? `${(meters / 1000).t
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F7FAF8' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24, backgroundColor: '#F7FAF8' },
-  hud: { position: 'absolute', left: 12, right: 72, top: 16, padding: 12, borderRadius: 16,zIndex:10, backgroundColor: 'rgba(255,255,255,0.96)', borderWidth: 1, borderColor: '#DCE5E0', elevation:4, shadowColor:'#0F172A',shadowOpacity:.08,shadowRadius:8 },
+  hud: { position: 'absolute', left: 12, right: 12, top: 16, padding: 12, borderRadius: 14,zIndex:10, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#D1D5DB' },
   missionText: { fontSize: 13, fontWeight: '800', color: '#374151', marginBottom: 8 },
   hudTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   state: { fontSize: 14, fontWeight: '900', color: '#065F46', letterSpacing: 1 },
@@ -274,7 +274,7 @@ const styles = StyleSheet.create({
   metric: { minWidth: 92, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 10, backgroundColor: '#F3F4F6' },
   metricValue: { fontSize: 18, fontWeight: '900', color: '#111827' },
   metricLabel: { marginTop: 2, fontSize: 12, fontWeight: '700', color: '#4B5563' },
-  mapControls:{position:'absolute',right:12,gap:7,zIndex:20},mapControl:{width:48,height:48,borderRadius:16,borderWidth:1,borderColor:'#CBD5E1',backgroundColor:'#FFFFFF',alignItems:'center',justifyContent:'center',elevation:5,shadowColor:'#0F172A',shadowOpacity:.14,shadowRadius:8},mapTypeMenu:{position:'absolute',right:72,width:155,borderWidth:2,borderColor:'#D1D5DB',borderRadius:14,backgroundColor:'#FFFFFF',padding:6},mapTypeRow:{minHeight:44,flexDirection:'row',alignItems:'center',gap:9,paddingHorizontal:10},mapTypeText:{fontSize:14,fontWeight:'800',color:'#111827'},fieldMenu:{position:'absolute',right:72,width:190,borderWidth:2,borderColor:'#D1D5DB',borderRadius:14,backgroundColor:'#FFF',padding:6},fieldRow:{minHeight:48,flexDirection:'row',alignItems:'center',gap:9,paddingHorizontal:10},fieldText:{fontSize:13,fontWeight:'800',color:'#111827'},
+  mapControls:{position:'absolute',right:12,gap:7,zIndex:20},mapControl:{width:44,height:44,borderRadius:14,borderWidth:2,borderColor:'#D1D5DB',backgroundColor:'#FFFFFF',alignItems:'center',justifyContent:'center'},mapTypeMenu:{position:'absolute',right:72,width:155,borderWidth:2,borderColor:'#D1D5DB',borderRadius:14,backgroundColor:'#FFFFFF',padding:6},mapTypeRow:{minHeight:44,flexDirection:'row',alignItems:'center',gap:9,paddingHorizontal:10},mapTypeText:{fontSize:14,fontWeight:'800',color:'#111827'},fieldMenu:{position:'absolute',right:72,width:190,borderWidth:2,borderColor:'#D1D5DB',borderRadius:14,backgroundColor:'#FFF',padding:6},fieldRow:{minHeight:48,flexDirection:'row',alignItems:'center',gap:9,paddingHorizontal:10},fieldText:{fontSize:13,fontWeight:'800',color:'#111827'},
   captureActions: { position: 'absolute', left: 12, right: 12, bottom: 92, flexDirection: 'row', gap: 7 },
   captureButton: { minHeight: 56, flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#047857', paddingHorizontal: 6 },
   captureText: { color: '#065F46', fontSize: 13, fontWeight: '900' },
