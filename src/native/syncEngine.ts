@@ -105,12 +105,21 @@ async function apply(item:OutboxQueueItem){
  const {error}=await query; if(error)throw error;
 }
 
+function describeSyncError(error:any){
+ if(error instanceof Error)return error.message;
+ if(error&&typeof error==='object'){
+   const parts=[error.code,error.message,error.details,error.hint].filter(Boolean).map(String);
+   if(parts.length)return parts.join(' · ');
+   try{return JSON.stringify(error)}catch{}
+ }
+ return String(error);
+}
 export async function syncPendingOutbox(limit=50){
  const pending=(await OutboxRepository.getPending(limit)).sort((a,b)=>{const rank=(x:OutboxQueueItem)=>x.tableName==='local_chat_channels'?0:x.tableName==='local_chat_messages'?2:1;return rank(a)-rank(b)||a.clientTimestamp-b.clientTimestamp;}); let synced=0,failed=0;
  for(const item of pending){
    try{await apply(item);await OutboxRepository.markSynced(item.id);await markLocalSynced(item.tableName,item.recordId);synced++;}
    catch(error){
-     const message=error instanceof Error?error.message:String(error);
+     const message=describeSyncError(error);
      const conflict=/409|conflict|duplicate key|version|HANDOVER_STALE/i.test(message);
      if(conflict) await OutboxRepository.markConflict(item.id,message);
      else await OutboxRepository.markFailed(item.id,message);
