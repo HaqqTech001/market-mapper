@@ -1,0 +1,10 @@
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import MapView,{Marker} from 'react-native-maps';
+import { Ionicons } from '@expo/vector-icons';
+
+export function SharedLocationViewer({location,onClose}:{location:{latitude:number;longitude:number;label:string}|null;onClose:()=>void}){
+ if(!location)return null;
+ const region={latitude:location.latitude,longitude:location.longitude,latitudeDelta:.004,longitudeDelta:.004};
+ return <Modal visible animationType="slide" onRequestClose={onClose}><View style={s.page}><View style={s.header}><Pressable style={s.close} onPress={onClose}><Ionicons name="arrow-back" size={24} color="#111827"/></Pressable><View><Text style={s.title}>{location.label||'Shared location'}</Text><Text style={s.sub}>Chat location preview</Text></View></View><MapView style={s.map} initialRegion={region} userInterfaceStyle="light" toolbarEnabled={false}><Marker coordinate={location} title={location.label||'Shared location'}/></MapView><View style={s.card}><Ionicons name="location" size={22} color="#047857"/><View style={{flex:1}}><Text style={s.cardTitle}>Shared position</Text><Text style={s.coords}>{location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}</Text></View></View></View></Modal>
+}
+const s=StyleSheet.create({page:{flex:1,backgroundColor:'#F8FAFC'},header:{height:92,paddingTop:34,paddingHorizontal:8,flexDirection:'row',alignItems:'center',backgroundColor:'#FFF',borderBottomWidth:1,borderColor:'#E2E8F0'},close:{width:48,height:48,alignItems:'center',justifyContent:'center'},title:{fontSize:17,fontWeight:'900',color:'#111827'},sub:{fontSize:12,color:'#64748B',marginTop:2},map:{flex:1},card:{position:'absolute',left:16,right:16,bottom:22,padding:14,borderRadius:16,backgroundColor:'#FFF',flexDirection:'row',alignItems:'center',gap:10,elevation:5,shadowOpacity:.14,shadowRadius:12},cardTitle:{fontWeight:'900',color:'#111827'},coords:{fontSize:12,color:'#64748B',marginTop:3}});
