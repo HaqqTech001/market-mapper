@@ -13,7 +13,7 @@ export type OperationalNotificationPayload = {
 };
 
 const delivered = new Set<string>();
-const CHANNEL = 'operations';
+const CHANNEL = 'operations_alerts_v2';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -38,10 +38,12 @@ export async function initializeOperationalNotifications() {
     await Notifications.setNotificationChannelAsync(CHANNEL, {
       name: 'Operational alerts',
       description: 'Mission, assignment, role and other Market Mapper operational alerts',
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 180, 120, 280],
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 180, 350],
       enableVibrate: true,
       showBadge: true,
+      enableLights: true,
+      lightColor: '#16A34A',
     });
   }
 
