@@ -46,6 +46,23 @@ export default function MapScreen() {
 
   const path = snapshot.acceptedPoints.map((p) => ({ latitude: p.latitude, longitude: p.longitude }));
 
+  const centerOnCurrentLocation = async () => {
+    try {
+      let point=current;
+      if(!point){
+        const existing=await nativeLocationService.getForegroundPermissionsAsync();
+        const granted=existing.granted?existing:await nativeLocationService.requestForegroundPermissionsAsync();
+        if(!granted.granted){setPermission(granted.status==='services_disabled'?'services_disabled':'denied');return;}
+        const location=await nativeLocationService.getCurrentPositionAsync({accuracy:'high'});
+        point={latitude:location.coords.latitude,longitude:location.coords.longitude};
+        setCurrent(point);
+      }
+      mapRef.current?.animateCamera({center:point,zoom:18},{duration:450});
+    } catch(error) {
+      Alert.alert('Location unavailable','Could not get your current position. Make sure Location is turned on and try again.');
+    }
+  };
+
   const ensureLocation = async () => {
     const existing = await nativeLocationService.getForegroundPermissionsAsync();
     const result = existing.granted ? existing : await nativeLocationService.requestForegroundPermissionsAsync();
@@ -153,7 +170,7 @@ export default function MapScreen() {
 
   return (
     <View style={styles.screen}>
-      <NativeFieldMap ref={mapRef} currentLocation={current} path={path} mapType={mapType} />
+      <NativeFieldMap ref={mapRef} currentLocation={current} path={path} mapType={mapType} mappingMode />
       <View style={[styles.hud,{top:Math.max(10,insets.top+6)}]}>
         <Text style={styles.missionText}>{mission ? mission.title : 'No assigned mission'}</Text>
         <View style={styles.hudTop}>
@@ -166,7 +183,7 @@ export default function MapScreen() {
         </View>
       </View>
       <View style={[styles.mapControls,{top:Math.max(mappingActive?118:142,insets.top+(mappingActive?106:130))}]}>
-        <Pressable accessibilityLabel="Center on my location" style={styles.mapControl} onPress={()=>{if(current)mapRef.current?.animateCamera({center:current,zoom:18},{duration:450});else ensureLocation();}}><Ionicons name="locate-outline" size={23} color="#111827"/></Pressable>
+        <Pressable accessibilityLabel="Center on my location" style={styles.mapControl} onPress={centerOnCurrentLocation}><Ionicons name="locate-outline" size={23} color="#111827"/></Pressable>
         <Pressable accessibilityLabel="Change map view" style={styles.mapControl} onPress={()=>setShowMapTypes(v=>!v)}><Ionicons name="layers-outline" size={23} color="#111827"/></Pressable>
         <Pressable accessibilityLabel="Zoom in" style={styles.mapControl} onPress={()=>mapRef.current?.getCamera().then(cam=>mapRef.current?.animateCamera({zoom:(cam.zoom||17)+1},{duration:250}))}><Ionicons name="add" size={24} color="#111827"/></Pressable>
         <Pressable accessibilityLabel="Zoom out" style={styles.mapControl} onPress={()=>mapRef.current?.getCamera().then(cam=>mapRef.current?.animateCamera({zoom:Math.max(3,(cam.zoom||17)-1)},{duration:250}))}><Ionicons name="remove" size={24} color="#111827"/></Pressable>
@@ -248,7 +265,7 @@ const formatDistance = (meters: number) => meters >= 1000 ? `${(meters / 1000).t
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F7FAF8' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24, backgroundColor: '#F7FAF8' },
-  hud: { position: 'absolute', left: 12, right: 12, top: 16, padding: 12, borderRadius: 14,zIndex:10, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#D1D5DB' },
+  hud: { position: 'absolute', left: 12, right: 72, top: 16, padding: 12, borderRadius: 16,zIndex:10, backgroundColor: 'rgba(255,255,255,0.96)', borderWidth: 1, borderColor: '#DCE5E0', elevation:4, shadowColor:'#0F172A',shadowOpacity:.08,shadowRadius:8 },
   missionText: { fontSize: 13, fontWeight: '800', color: '#374151', marginBottom: 8 },
   hudTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   state: { fontSize: 14, fontWeight: '900', color: '#065F46', letterSpacing: 1 },
@@ -257,7 +274,7 @@ const styles = StyleSheet.create({
   metric: { minWidth: 92, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 10, backgroundColor: '#F3F4F6' },
   metricValue: { fontSize: 18, fontWeight: '900', color: '#111827' },
   metricLabel: { marginTop: 2, fontSize: 12, fontWeight: '700', color: '#4B5563' },
-  mapControls:{position:'absolute',right:12,gap:7,zIndex:20},mapControl:{width:44,height:44,borderRadius:14,borderWidth:2,borderColor:'#D1D5DB',backgroundColor:'#FFFFFF',alignItems:'center',justifyContent:'center'},mapTypeMenu:{position:'absolute',right:72,width:155,borderWidth:2,borderColor:'#D1D5DB',borderRadius:14,backgroundColor:'#FFFFFF',padding:6},mapTypeRow:{minHeight:44,flexDirection:'row',alignItems:'center',gap:9,paddingHorizontal:10},mapTypeText:{fontSize:14,fontWeight:'800',color:'#111827'},fieldMenu:{position:'absolute',right:72,width:190,borderWidth:2,borderColor:'#D1D5DB',borderRadius:14,backgroundColor:'#FFF',padding:6},fieldRow:{minHeight:48,flexDirection:'row',alignItems:'center',gap:9,paddingHorizontal:10},fieldText:{fontSize:13,fontWeight:'800',color:'#111827'},
+  mapControls:{position:'absolute',right:12,gap:7,zIndex:20},mapControl:{width:48,height:48,borderRadius:16,borderWidth:1,borderColor:'#CBD5E1',backgroundColor:'#FFFFFF',alignItems:'center',justifyContent:'center',elevation:5,shadowColor:'#0F172A',shadowOpacity:.14,shadowRadius:8},mapTypeMenu:{position:'absolute',right:72,width:155,borderWidth:2,borderColor:'#D1D5DB',borderRadius:14,backgroundColor:'#FFFFFF',padding:6},mapTypeRow:{minHeight:44,flexDirection:'row',alignItems:'center',gap:9,paddingHorizontal:10},mapTypeText:{fontSize:14,fontWeight:'800',color:'#111827'},fieldMenu:{position:'absolute',right:72,width:190,borderWidth:2,borderColor:'#D1D5DB',borderRadius:14,backgroundColor:'#FFF',padding:6},fieldRow:{minHeight:48,flexDirection:'row',alignItems:'center',gap:9,paddingHorizontal:10},fieldText:{fontSize:13,fontWeight:'800',color:'#111827'},
   captureActions: { position: 'absolute', left: 12, right: 12, bottom: 92, flexDirection: 'row', gap: 7 },
   captureButton: { minHeight: 56, flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#047857', paddingHorizontal: 6 },
   captureText: { color: '#065F46', fontSize: 13, fontWeight: '900' },
