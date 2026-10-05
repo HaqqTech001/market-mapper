@@ -7,6 +7,7 @@
 import { getDatabase } from '../sqlite';
 import { ChatChannel, ChatMessage, UserRole, SyncStatus, ChatMessageType, ChatAttachment } from '../../types';
 import { OutboxRepository } from './OutboxRepository';
+import { nativeSupabase } from '../../native/supabase';
 
 
 export class ChatRepository {
@@ -334,7 +335,16 @@ export class ChatRepository {
   }
   static async getChannelParticipants(channel:ChatChannel):Promise<Array<{id:string;name:string;role:UserRole}>>{
     if(channel.missionId){
-      const rows=await this.db.getAllAsync<any>(`SELECT mm.user_id,p.full_name,p.role FROM local_mission_members mm LEFT JOIN local_profiles p ON p.id=mm.user_id WHERE mm.mission_id=? ORDER BY p.full_name;`,[channel.missionId]);
+      // Group info should reflect authoritative membership when online, not wait
+      // for a separate local mission hydration pass.
+      try{
+        const {data,error}=await nativeSupabase.from('mission_members')
+          .select('user_id,role,profiles!mission_members_user_id_fkey(full_name,role)')
+          .eq('mission_id',channel.missionId);
+        if(error)throw error;
+        if(data?.length)return data.map((r:any)=>({id:r.user_id,name:r.profiles?.full_name||'Team member',role:(r.profiles?.role||r.role||'mapper') as UserRole}));
+      }catch{}
+      const rows=await this.db.getAllAsync<any>(`SELECT mm.user_id,mm.user_name,p.full_name,p.role FROM local_mission_members mm LEFT JOIN local_profiles p ON p.id=mm.user_id WHERE mm.mission_id=? ORDER BY COALESCE(p.full_name,mm.user_name);`,[channel.missionId]);
       return rows.map(r=>({id:r.user_id,name:r.full_name||r.user_name||'Team member',role:(r.role||'mapper') as UserRole}));
     }
     const rows=await this.db.getAllAsync<any>(`SELECT DISTINCT m.sender_id AS id,COALESCE(p.full_name,m.sender_name) AS name,COALESCE(p.role,m.sender_role,'mapper') AS role FROM local_chat_messages m LEFT JOIN local_profiles p ON p.id=m.sender_id WHERE m.channel_id=? ORDER BY name;`,[channel.id]);
