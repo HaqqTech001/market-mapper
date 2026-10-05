@@ -12,7 +12,13 @@ export async function hydrateOperationalMessaging(userId:string,missionIds:strin
    if(c.id==='general'||c.channel_type==='general')return canonicalGeneral?.id===c.id;
    return !c.mission_id||missionIds.includes(c.mission_id);
  });
- for(const c of allowed)await db.runAsync("INSERT OR REPLACE INTO local_chat_channels(id,name,channel_type,team_id,mission_id,last_message_snippet,last_message_time,unread_count,is_muted,created_at,description,avatar_path,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",[c.id,c.name,c.channel_type,c.team_id||null,c.mission_id||null,null,null,0,0,c.created_at,c.description||null,c.avatar_path||null,c.updated_at||null]);
+ for(const c of allowed)await db.runAsync(`INSERT INTO local_chat_channels
+  (id,name,channel_type,team_id,mission_id,last_message_snippet,last_message_time,unread_count,created_at)
+  VALUES (?,?,?,?,?,NULL,NULL,0,?)
+  ON CONFLICT(id) DO UPDATE SET
+   name=excluded.name,channel_type=excluded.channel_type,team_id=excluded.team_id,
+   mission_id=excluded.mission_id;`,
+  [c.id,c.name,c.channel_type,c.team_id||null,c.mission_id||null,c.created_at]);
  const ids=allowed.map((c:any)=>c.id);
  for(const id of ids){const {data:messages,error}=await nativeSupabase.from('chat_messages').select('*').eq('channel_id',id).order('created_at',{ascending:false}).limit(100);if(error)throw error;for(const p of (messages||[]).reverse())await db.runAsync("INSERT OR IGNORE INTO local_chat_messages(id,channel_id,sender_id,sender_name,sender_avatar,sender_role,reply_to_id,text,is_pinned,linked_business_id,linked_business_name,linked_path_id,linked_path_name,linked_issue_id,linked_issue_title,shared_location_json,message_type,attachment_json,reactions_json,edited_at,deleted_at,created_at,sync_status) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')",[p.id,p.channel_id,p.sender_id,p.sender_name,p.sender_avatar||null,p.sender_role,p.reply_to_id||null,p.text,p.is_pinned?1:0,p.linked_business_id||null,p.linked_business_name||null,p.linked_path_id||null,p.linked_path_name||null,p.linked_issue_id||null,p.linked_issue_title||null,p.shared_location?JSON.stringify(p.shared_location):null,p.message_type||'text',p.attachment?JSON.stringify(p.attachment):null,p.reactions?JSON.stringify(p.reactions):null,p.edited_at||null,p.deleted_at||null,p.created_at]);}
  const messageIds:string[]=[]; for(const id of ids){const rows=await db.getAllAsync<any>('SELECT id FROM local_chat_messages WHERE channel_id=?;',[id]);messageIds.push(...rows.map(r=>r.id))}
