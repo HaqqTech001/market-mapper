@@ -105,7 +105,11 @@ export class PathRepository {
         accepted, rejection_reason, created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
-        sample.id,
+        // V1 shipped this table with INTEGER PRIMARY KEY AUTOINCREMENT. Existing
+        // field databases therefore cannot store our string gps_* id in that column.
+        // Let SQLite allocate the numeric PK; session/segment/sequence are the durable
+        // identity/order for raw samples.
+        null,
         sample.sessionId,
         sample.segmentId,
         sample.sequenceNumber,
@@ -226,7 +230,7 @@ export class PathRepository {
       [sessionId]
     );
     const points: RawGpsSample[] = pointRows.map((p) => ({
-      id: p.id || `pt_${p.timestamp}`,
+      id: `gps_${p.timestamp}_${Number(p.sequence_number || 0)}`,
       sessionId: p.session_id,
       segmentId: p.segment_id || '',
       sequenceNumber: Number(p.sequence_number || 0),
@@ -294,7 +298,7 @@ export class PathRepository {
       [sessionId]
     );
     return pointRows.map((p) => ({
-      id: p.id || `pt_${p.timestamp}`,
+      id: `gps_${p.timestamp}_${Number(p.sequence_number || 0)}`,
       sessionId: p.session_id,
       segmentId: p.segment_id || '',
       sequenceNumber: Number(p.sequence_number || 0),
