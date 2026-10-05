@@ -40,7 +40,15 @@ export class ChatRepository {
       };
     }
 
-    const id = `chn_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    // Stable cloud IDs are essential: a fresh local database must reopen the same
+    // Supabase channel instead of creating a new random conversation.
+    const id = channelType === 'general'
+      ? 'general'
+      : missionId
+        ? `mission_${missionId}`
+        : teamId
+          ? `team_${teamId}`
+          : `chn_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const now = new Date().toISOString();
 
     const newChannel: ChatChannel = {
