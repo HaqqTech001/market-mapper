@@ -60,13 +60,23 @@ export async function hydrateChatFromCloud(): Promise<{channels:number;messages:
   const channelIds=(channels||[]).map(c=>c.id);
   if(!channelIds.length)return {channels:0,messages:0};
 
-  const {data:messages,error:messageError}=await nativeSupabase
+  // Core columns exist in the original chat schema. Pull them first so a
+  // deployment missing a later rich-chat migration can never erase history.
+  let {data:messages,error:messageError}=await nativeSupabase
     .from('chat_messages')
-    .select('id,channel_id,sender_id,sender_name,sender_avatar,sender_role,reply_to_id,text,is_pinned,linked_business_id,linked_business_name,linked_path_id,linked_path_name,linked_issue_id,linked_issue_title,shared_location,message_type,attachment,reactions,edited_at,deleted_at,created_at')
+    .select('id,channel_id,sender_id,sender_name,sender_avatar,sender_role,reply_to_id,text,is_pinned,linked_business_id,linked_business_name,linked_path_id,linked_path_name,linked_issue_id,linked_issue_title,shared_location,created_at')
     .in('channel_id',channelIds)
     .order('created_at',{ascending:true})
     .limit(1000);
   if(messageError) throw messageError;
+  // Enrich opportunistically when the deployed schema supports it.
+  const rich=await nativeSupabase.from('chat_messages')
+    .select('id,message_type,attachment,reactions,edited_at,deleted_at')
+    .in('channel_id',channelIds).limit(1000);
+  if(!rich.error&&rich.data){
+    const byId=new Map(rich.data.map((x:any)=>[x.id,x]));
+    messages=(messages||[]).map((m:any)=>({...m,...(byId.get(m.id)||{})}));
+  }
 
   for(const m of messages||[]){
     await db.runAsync(
