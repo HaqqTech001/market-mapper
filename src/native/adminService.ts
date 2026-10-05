@@ -107,3 +107,17 @@ export async function removeAdminMissionMember(missionId:string,userId:string){a
 export async function addAdminMissionArea(input:{missionId:string;areaName:string;userId:string;notes?:string}){await requireAdmin();const id='area_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);const {error}=await nativeSupabase.from('mission_area_assignments').insert({mission_id:input.missionId,user_id:input.userId,assigned_to_user_id:input.userId,area_id:id,area_name:input.areaName.trim(),notes:input.notes?.trim()||null,status:'assigned'});if(error)throw error}
 export async function updateAdminMissionStart(missionId:string,latitude:number,longitude:number){await requireAdmin();const {error}=await nativeSupabase.from('missions').update({assigned_starting_lat:latitude,assigned_starting_lng:longitude,updated_at:new Date().toISOString()}).eq('id',missionId);if(error)throw error}
 export async function setAdminMissionStatus(missionId:string,status:'draft'|'active'|'paused'|'completed'|'cancelled'|'archived'){await requireAdmin();const {error}=await nativeSupabase.from('missions').update({status,updated_at:new Date().toISOString()}).eq('id',missionId);if(error)throw error}
+
+export async function updateAdminMission(missionId:string,input:{title?:string;description?:string;status?:'draft'|'active'|'paused'|'completed'|'cancelled'|'archived'}){
+ await requireAdmin();const payload:Record<string,unknown>={updated_at:new Date().toISOString()};
+ if(input.title!==undefined)payload.title=input.title.trim();
+ if(input.description!==undefined)payload.description=input.description.trim()||null;
+ if(input.status!==undefined)payload.status=input.status;
+ const {error}=await nativeSupabase.from('missions').update(payload).eq('id',missionId);if(error)throw error;
+}
+export async function deleteAdminMission(missionId:string){
+ await requireAdmin();
+ // DB FKs cascade mission members, assignments and mission chat rows. This is
+ // intentionally a cloud delete first so deleted missions cannot rehydrate.
+ const {error}=await nativeSupabase.from('missions').delete().eq('id',missionId);if(error)throw error;
+}
