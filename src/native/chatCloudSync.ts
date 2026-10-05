@@ -20,6 +20,12 @@ export async function hydrateChatFromCloud(): Promise<{channels:number;messages:
     for(const channel of channels||[])Object.assign(channel,meta.get(channel.id)||{});
   }
 
+  // Canonicalize legacy channel identities before hydration. General Chat is a
+  // singleton with the stable id `general`; mission chats are singletons per mission.
+  // We preserve messages by remapping legacy channel ids instead of deleting them.
+  const generalChannels=(channels||[]).filter((c:any)=>c.id==='general'||c.channel_type==='general');
+  const canonicalGeneral=generalChannels.find((c:any)=>c.id==='general')||generalChannels[0]||null;
+
   // Legacy builds could create more than one cloud channel for the same mission.
   // Pick one stable existing cloud row per mission and collapse the local cache to it.
   const canonicalByMission=new Map<string,any>();
@@ -33,15 +39,35 @@ export async function hydrateChatFromCloud(): Promise<{channels:number;messages:
   }
   const channelIdMap=new Map<string,string>();
   for(const c of channels||[]){
-    const canonical=c.mission_id?canonicalByMission.get(c.mission_id):c;
+    const canonical=(c.id==='general'||c.channel_type==='general')?canonicalGeneral:(c.mission_id?canonicalByMission.get(c.mission_id):c);
     channelIdMap.set(c.id,canonical?.id||c.id);
+  }
+
+  // Repair local legacy General Chat rows transactionally enough to be idempotent:
+  // move every message to the canonical id, retarget queued message payloads, then
+  // remove only empty obsolete channel rows. Never discard a message or outbox item.
+  if(canonicalGeneral){
+    const localGenerals=await db.getAllAsync<any>("SELECT id FROM local_chat_channels WHERE id='general' OR channel_type='general';");
+    for(const legacy of localGenerals){
+      if(legacy.id===canonicalGeneral.id)continue;
+      await db.runAsync('UPDATE local_chat_messages SET channel_id=? WHERE channel_id=?;',[canonicalGeneral.id,legacy.id]);
+      const queued=await db.getAllAsync<any>("SELECT id,payload FROM local_outbox_queue WHERE table_name='local_chat_messages' AND payload LIKE ?;",['%'+legacy.id+'%']);
+      for(const q of queued){
+        try{const p=JSON.parse(q.payload||'{}');if(p.channelId===legacy.id){p.channelId=canonicalGeneral.id;await db.runAsync('UPDATE local_outbox_queue SET payload=? WHERE id=?;',[JSON.stringify(p),q.id]);}}catch{}
+      }
+      await db.runAsync("DELETE FROM local_outbox_queue WHERE table_name='local_chat_channels' AND record_id=?;",[legacy.id]);
+      await db.runAsync('DELETE FROM local_chat_channels WHERE id=?;',[legacy.id]);
+    }
   }
 
   // Never delete a local channel during hydration. It may contain messages that
   // have not reached Supabase yet. Duplicate cleanup belongs to explicit mission
   // deletion/repair, not the read path.
 
-  const canonicalChannels=(channels||[]).filter(c=>!c.mission_id || canonicalByMission.get(c.mission_id)?.id===c.id);
+  const canonicalChannels=(channels||[]).filter(c=>{
+    if(c.id==='general'||c.channel_type==='general')return canonicalGeneral?.id===c.id;
+    return !c.mission_id || canonicalByMission.get(c.mission_id)?.id===c.id;
+  });
   for(const c of canonicalChannels){
     await db.runAsync(
       `INSERT INTO local_chat_channels
