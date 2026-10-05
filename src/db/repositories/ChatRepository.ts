@@ -18,10 +18,29 @@ export class ChatRepository {
     teamId?: string,
     missionId?: string
   ): Promise<ChatChannel> {
-    const existing = await this.db.getFirstAsync<any>(
-      `SELECT * FROM local_chat_channels WHERE name = ? OR (channel_type = ? AND (team_id = ? OR mission_id = ?));`,
-      [name, channelType, teamId || '', missionId || '']
-    );
+    // Mission/team identity is relational, not presentational. Names may change and
+    // must never be allowed to create a second channel for the same mission/team.
+    let existing: any = null;
+    if (channelType === 'mission' && missionId) {
+      existing = await this.db.getFirstAsync<any>(
+        `SELECT * FROM local_chat_channels WHERE channel_type = 'mission' AND mission_id = ? ORDER BY created_at ASC LIMIT 1;`,
+        [missionId]
+      );
+    } else if (channelType === 'team' && teamId) {
+      existing = await this.db.getFirstAsync<any>(
+        `SELECT * FROM local_chat_channels WHERE channel_type = 'team' AND team_id = ? ORDER BY created_at ASC LIMIT 1;`,
+        [teamId]
+      );
+    } else if (channelType === 'general') {
+      existing = await this.db.getFirstAsync<any>(
+        `SELECT * FROM local_chat_channels WHERE id = 'general' OR channel_type = 'general' ORDER BY CASE WHEN id='general' THEN 0 ELSE 1 END, created_at ASC LIMIT 1;`
+      );
+    } else {
+      existing = await this.db.getFirstAsync<any>(
+        `SELECT * FROM local_chat_channels WHERE channel_type = ? AND name = ? ORDER BY created_at ASC LIMIT 1;`,
+        [channelType, name]
+      );
+    }
 
     if (existing) {
       return {
@@ -40,8 +59,6 @@ export class ChatRepository {
       };
     }
 
-    // Stable cloud IDs are essential: a fresh local database must reopen the same
-    // Supabase channel instead of creating a new random conversation.
     const id = channelType === 'general'
       ? 'general'
       : missionId
@@ -61,12 +78,31 @@ export class ChatRepository {
       createdAt: now,
     };
 
+    // INSERT OR IGNORE protects startup races. Re-read by relational identity
+    // afterwards so concurrent callers always converge on one channel.
     await this.db.runAsync(
-      `INSERT INTO local_chat_channels (
+      `INSERT OR IGNORE INTO local_chat_channels (
         id, name, channel_type, team_id, mission_id, unread_count, created_at
       ) VALUES (?, ?, ?, ?, ?, 0, ?);`,
       [id, name, channelType, teamId || null, missionId || null, now]
     );
+
+    const resolved = channelType === 'mission' && missionId
+      ? await this.db.getFirstAsync<any>("SELECT * FROM local_chat_channels WHERE channel_type='mission' AND mission_id=? ORDER BY created_at ASC LIMIT 1;", [missionId])
+      : channelType === 'team' && teamId
+        ? await this.db.getFirstAsync<any>("SELECT * FROM local_chat_channels WHERE channel_type='team' AND team_id=? ORDER BY created_at ASC LIMIT 1;", [teamId])
+        : await this.db.getFirstAsync<any>('SELECT * FROM local_chat_channels WHERE id=?;', [id]);
+
+    if (resolved?.id !== id) {
+      return {
+        id: resolved.id, name: resolved.name, channelType: resolved.channel_type,
+        teamId: resolved.team_id || undefined, missionId: resolved.mission_id || undefined,
+        unreadCount: Number(resolved.unread_count || 0), lastMessageSnippet: resolved.last_message_snippet || undefined,
+        lastMessageTime: resolved.last_message_time || undefined, createdAt: resolved.created_at,
+        description: resolved.description || undefined, avatarPath: resolved.avatar_path || undefined,
+        updatedAt: resolved.updated_at || undefined,
+      };
+    }
 
     await OutboxRepository.enqueue('local_chat_channels', id, 'INSERT', newChannel as unknown as Record<string, unknown>);
     return newChannel;
