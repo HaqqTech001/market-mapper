@@ -42,6 +42,7 @@ export async function initializeOperationalNotifications() {
       vibrationPattern: [0, 180, 120, 280],
       enableVibrate: true,
       showBadge: true,
+      sound: 'default',
     });
   }
 
@@ -73,7 +74,7 @@ export async function presentOperationalNotification(payload: OperationalNotific
     content: {
       title: payload.title,
       body: payload.body,
-      sound: true,
+      sound: 'default',
       data: {
         notificationId: payload.id,
         entityReferenceType: payload.entityReferenceType ?? null,
