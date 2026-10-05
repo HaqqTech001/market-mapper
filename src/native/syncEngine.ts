@@ -133,6 +133,15 @@ async function apply(item:OutboxQueueItem){
    if(p.connectedPathId!==undefined)mapped.connected_path_id=p.connectedPathId;
    if(p.connectedTargetJunctionId!==undefined)mapped.connected_target_junction_id=p.connectedTargetJunctionId;
  } else mapped=target.map(p);
+ if(item.tableName==='catalogue_suggestions' && item.action==='INSERT' && mapped.suggested_category_id){
+   // Local catalogue caches can outlive a cloud category rename/removal. Do
+   // not strand a mapper's new product suggestion behind a stale FK. Keep
+   // the suggestion and let admin categorise it if the referenced category
+   // no longer exists in the authoritative cloud catalogue.
+   const {data:category,error:categoryError}=await nativeSupabase.from('catalogue_categories').select('id').eq('id',mapped.suggested_category_id).maybeSingle();
+   if(categoryError)throw categoryError;
+   if(!category?.id)mapped.suggested_category_id=null;
+ }
  if(item.tableName==='local_chat_messages' && item.action==='INSERT'){await ensureCloudChatChannel(String(mapped.channel_id));await upsertChatMessageCompatible(mapped);return;}
  if(item.tableName==='local_chat_channels' && item.action==='INSERT'){
    const {data:existing,error:lookupError}=await nativeSupabase.from('chat_channels').select('id').eq('id',item.recordId).maybeSingle();
