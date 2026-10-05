@@ -41,7 +41,7 @@ export class OutboxRepository {
 
   static async getPending(limit = 50): Promise<OutboxQueueItem[]> {
     const rows = await this.db.getAllAsync<any>(
-      `SELECT * FROM local_outbox_queue WHERE status = 'pending' AND retry_count < 5 ORDER BY client_timestamp ASC LIMIT ?;`,
+      `SELECT * FROM local_outbox_queue WHERE status = 'pending' AND retry_count < 20 ORDER BY client_timestamp ASC LIMIT ?;`,
       [limit]
     );
 
@@ -98,7 +98,7 @@ export class OutboxRepository {
 
   static async retryFailed(id?: string): Promise<void> {
     if (id) await this.db.runAsync(`UPDATE local_outbox_queue SET status = 'pending', error_message = NULL WHERE id = ? AND status = 'failed';`, [id]);
-    else await this.db.runAsync(`UPDATE local_outbox_queue SET status = 'pending', error_message = NULL WHERE status = 'failed' AND retry_count < 5;`);
+    else await this.db.runAsync(`UPDATE local_outbox_queue SET status = 'pending', error_message = NULL WHERE status = 'failed' AND retry_count < 20;`);
   }
 
   static async getQueue(limit = 200): Promise<OutboxQueueItem[]> {
