@@ -29,8 +29,7 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/branding/market-mapper-icon.png",
         "backgroundColor": "#F4FBEF"
-      },
-      "edgeToEdgeEnabled": true
+      }
     },
     "plugins": [
       "expo-router",
