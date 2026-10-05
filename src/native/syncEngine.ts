@@ -26,6 +26,15 @@ function mapMission(p:Payload){return {id:p.id,market_id:p.marketId||null,title:
 function mapCatalogueSuggestion(p:Payload){return {id:p.id,suggested_by:p.suggestedBy,name:p.name,item_type:p.itemType,suggested_category_id:p.suggestedCategoryId||null,notes:p.reviewerNotes||p.notes||null,status:'pending',created_at:p.createdAt};}
 function mapNotification(p:Payload){return {id:p.id,recipient_id:p.recipientId,type:p.type,title:p.title,body:p.body,entity_reference_type:p.entityReferenceType||null,entity_reference_id:p.entityReferenceId||null,is_read:!!p.isRead,created_at:p.createdAt};}
 
+async function ensureCloudChatChannel(channelId:string){
+ const db=getDatabase();
+ const row=await db.getFirstAsync<any>('SELECT id,name,channel_type,team_id,mission_id,created_at FROM local_chat_channels WHERE id=?;',[channelId]);
+ if(!row)throw new Error('CHAT_CHANNEL_MISSING_LOCAL:'+channelId);
+ const payload={id:row.id,name:row.name,channel_type:row.channel_type,team_id:row.team_id||null,mission_id:row.mission_id||null,created_at:row.created_at};
+ const {error}=await nativeSupabase.from('chat_channels').upsert(payload,{onConflict:'id'});
+ if(error)throw error;
+}
+
 async function upsertChatMessageCompatible(mapped:Payload){
  let candidate={...mapped};
  for(let attempt=0;attempt<12;attempt++){
@@ -54,7 +63,11 @@ async function apply(item:OutboxQueueItem){
  }
  if(item.tableName==='local_chat_message_receipts'){
    const mapped={message_id:p.messageId,user_id:p.userId,delivered_at:p.deliveredAt||null,read_at:p.readAt||null};
-   const {error}=await nativeSupabase.from('chat_message_receipts').upsert(mapped,{onConflict:'message_id,user_id'});if(error)throw error;return;
+   const {error}=await nativeSupabase.from('chat_message_receipts').upsert(mapped,{onConflict:'message_id,user_id'});
+   // Receipts were introduced after core chat. An older live schema must not
+   // block messages, missions or field records from syncing.
+   if(error?.code==='PGRST205')return;
+   if(error)throw error;return;
  }
  if(item.tableName==='businesses'){
    const offerings=p.offerings||[]; const business=mapBusiness(p);
@@ -100,7 +113,7 @@ async function apply(item:OutboxQueueItem){
    if(p.connectedPathId!==undefined)mapped.connected_path_id=p.connectedPathId;
    if(p.connectedTargetJunctionId!==undefined)mapped.connected_target_junction_id=p.connectedTargetJunctionId;
  } else mapped=target.map(p);
- if(item.tableName==='local_chat_messages' && item.action==='INSERT'){await upsertChatMessageCompatible(mapped);return;}
+ if(item.tableName==='local_chat_messages' && item.action==='INSERT'){await ensureCloudChatChannel(String(mapped.channel_id));await upsertChatMessageCompatible(mapped);return;}
  const query=item.action==='DELETE'?nativeSupabase.from(target.table).delete().eq('id',item.recordId):item.action==='UPDATE'?nativeSupabase.from(target.table).update(mapped).eq('id',item.recordId):nativeSupabase.from(target.table).upsert(mapped,{onConflict:'id'});
  const {error}=await query; if(error)throw error;
 }
