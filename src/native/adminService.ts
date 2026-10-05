@@ -102,7 +102,19 @@ export async function getAdminMission(id:string){
   mission_area_assignments:areas
  };
 }
-export async function addAdminMissionMember(missionId:string,userId:string,role:'mapper'|'team_lead'='mapper'){await requireAdmin();const {error}=await nativeSupabase.from('mission_members').upsert({mission_id:missionId,user_id:userId,role},{onConflict:'mission_id,user_id'});if(error)throw error}
+export async function addAdminMissionMember(missionId:string,userId:string,role:'mapper'|'team_lead'='mapper'){
+ await requireAdmin();
+ const {error}=await nativeSupabase.from('mission_members').upsert({mission_id:missionId,user_id:userId,role},{onConflict:'mission_id,user_id'});if(error)throw error;
+ const {data:mission}=await nativeSupabase.from('missions').select('title').eq('id',missionId).maybeSingle();
+ // Explicit producer: do not depend on an optional historical DB trigger.
+ const notificationId='mission_assign_'+missionId+'_'+userId;
+ const {error:notificationError}=await nativeSupabase.from('notifications').upsert({
+   id:notificationId,recipient_id:userId,type:'mission_assignment',title:'New mission assignment',
+   body:'You were added to '+(mission?.title||'a mapping mission')+'.',
+   entity_reference_type:'mission',entity_reference_id:missionId,is_read:false,created_at:new Date().toISOString()
+ },{onConflict:'id'});
+ if(notificationError)console.warn('Mission assignment saved but notification could not be created',notificationError);
+}
 export async function removeAdminMissionMember(missionId:string,userId:string){await requireAdmin();const {error}=await nativeSupabase.from('mission_members').delete().eq('mission_id',missionId).eq('user_id',userId);if(error)throw error}
 export async function addAdminMissionArea(input:{missionId:string;areaName:string;userId:string;notes?:string}){await requireAdmin();const id='area_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);const {error}=await nativeSupabase.from('mission_area_assignments').insert({mission_id:input.missionId,user_id:input.userId,assigned_to_user_id:input.userId,area_id:id,area_name:input.areaName.trim(),notes:input.notes?.trim()||null,status:'assigned'});if(error)throw error}
 export async function updateAdminMissionStart(missionId:string,latitude:number,longitude:number){await requireAdmin();const {error}=await nativeSupabase.from('missions').update({assigned_starting_lat:latitude,assigned_starting_lng:longitude,updated_at:new Date().toISOString()}).eq('id',missionId);if(error)throw error}
