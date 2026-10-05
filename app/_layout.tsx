@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Stack, usePathname } from 'expo-router';
+import { Stack, router, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import { AuthGate } from '@/src/native/AuthGate';
 import { IncomingCallLifecycle } from '@/src/native/IncomingCallLifecycle';
 import { registerGlobals } from '@livekit/react-native';
 import { AutoSyncLifecycle } from '@/src/native/AutoSyncLifecycle';
+import { getDatabase } from '@/src/db/sqlite';
 
 registerGlobals();
 
@@ -29,6 +30,8 @@ export default function RootLayout() {
       });
     return () => { active = false; };
   }, []);
+
+  useEffect(()=>{if(state!=='ready')return;(async()=>{try{const active=await getDatabase().getFirstAsync<any>("SELECT session_id FROM local_path_sessions WHERE status IN ('recording','paused','reviewing') ORDER BY last_saved_at DESC LIMIT 1;");if(active&&!['/map','/sign-in','/register','/forgot-password','/verify-account','/reset-password'].includes(pathname))router.replace('/map')}catch(error){console.warn('Could not restore active mapping route',error)}})()},[state]);
 
   if (state === 'booting') {
     return (
