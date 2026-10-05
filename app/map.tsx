@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import MapView, { type LatLng, type MapType } from 'react-native-maps';
 import type { LocationSubscription } from '@/src/lib/location/locationService';
 import { NativeFieldMap } from '@/src/native/NativeFieldMap';
@@ -44,6 +44,7 @@ export default function MapScreen() {
   const [showFieldMenu,setShowFieldMenu]=useState(false);
   const mappingActive=snapshot.status==='recording'||snapshot.status==='paused';
   const insets = useSafeAreaInsets();
+  const params=useLocalSearchParams<{resumeBusinessDraft?:string}>();
 
   const path = snapshot.acceptedPoints.map((p) => ({ latitude: p.latitude, longitude: p.longitude }));
 
@@ -101,7 +102,8 @@ export default function MapScreen() {
         // An active draft means capture was interrupted (process death/crash/
         // accidental close). Restore it automatically. Intentionally parked
         // "saved_later" drafts remain parked until the mapper chooses Resume.
-        if(await CaptureDraftRepository.hasActiveBusiness())setCapture('business');
+        const businessDraft=await CaptureDraftRepository.getBusiness();
+        if(businessDraft?.status==='active'||(businessDraft?.status==='saved_later'&&params.resumeBusinessDraft==='1'))setCapture('business');
       } catch (error) {
         setContextError(error instanceof Error ? error.message : 'AUTH_REQUIRED');
         console.error('Native user context failed', error);
