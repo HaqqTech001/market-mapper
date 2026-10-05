@@ -9,6 +9,7 @@ import { FieldBottomNav } from '@/src/native/FieldBottomNav';
 import { AuthGate } from '@/src/native/AuthGate';
 import { IncomingCallLifecycle } from '@/src/native/IncomingCallLifecycle';
 import { registerGlobals } from '@livekit/react-native';
+import { AutoSyncLifecycle } from '@/src/native/AutoSyncLifecycle';
 
 registerGlobals();
 
@@ -51,6 +52,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
     <AuthGate>
       <OperationalRealtimeLifecycle />
+      <AutoSyncLifecycle />
       <IncomingCallLifecycle />
       <StatusBar style="dark" />
       <View style={{flex:1}}><Stack screenOptions={{ headerShown: false }} /></View>
