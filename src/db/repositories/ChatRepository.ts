@@ -139,10 +139,12 @@ export class ChatRepository {
     }));
   }
 
-  static async getMessages(channelId: string, limit = 100): Promise<ChatMessage[]> {
-    const rows = await this.db.getAllAsync<any>(
-      `SELECT * FROM local_chat_messages WHERE channel_id = ? ORDER BY created_at ASC LIMIT ?;`,
-      [channelId, limit]
+  static async getMessages(channelId: string, limit = 100, viewerId?:string): Promise<ChatMessage[]> {
+    await this.ensureDeleteMetadata();
+    const rows = viewerId?await this.db.getAllAsync<any>(
+      `SELECT m.* FROM local_chat_messages m WHERE m.channel_id = ? AND NOT EXISTS (SELECT 1 FROM local_chat_hidden_messages h WHERE h.message_id=m.id AND h.user_id=?) ORDER BY m.created_at ASC LIMIT ?;`,[channelId,viewerId,limit]
+    ):await this.db.getAllAsync<any>(
+      `SELECT * FROM local_chat_messages WHERE channel_id = ? ORDER BY created_at ASC LIMIT ?;`,[channelId,limit]
     );
 
     return rows.map((r) => {
@@ -167,6 +169,8 @@ export class ChatRepository {
         reactions: r.reactions_json ? JSON.parse(r.reactions_json) : undefined,
         editedAt: r.edited_at || undefined,
         deletedAt: r.deleted_at || undefined,
+        deletedById: r.deleted_by_id || undefined,
+        deletedByName: r.deleted_by_name || undefined,
         isPinned: Boolean(r.is_pinned || r.isPinned),
         linkedBusinessId: r.linked_business_id || r.linkedBusinessId,
         linkedBusinessName: r.linked_business_name || r.linkedBusinessName,
@@ -286,7 +290,10 @@ export class ChatRepository {
     await OutboxRepository.enqueue('local_chat_messages',messageId,'UPDATE',{id:messageId,reactions});
   }
   static async editMessage(messageId:string,text:string):Promise<void>{const editedAt=new Date().toISOString();await this.db.runAsync('UPDATE local_chat_messages SET text=?,edited_at=? WHERE id=?;',[text,editedAt,messageId]);await OutboxRepository.enqueue('local_chat_messages',messageId,'UPDATE',{id:messageId,text,editedAt})}
-  static async deleteMessage(messageId:string):Promise<void>{const deletedAt=new Date().toISOString();await this.db.runAsync("UPDATE local_chat_messages SET text='',deleted_at=? WHERE id=?;",[deletedAt,messageId]);await OutboxRepository.enqueue('local_chat_messages',messageId,'UPDATE',{id:messageId,text:'',deletedAt})}
+  static async deleteMessage(messageId:string,deletedBy:{id:string;name:string}):Promise<void>{const deletedAt=new Date().toISOString();await this.ensureDeleteMetadata();await this.db.runAsync("UPDATE local_chat_messages SET text='',attachment_json=NULL,reactions_json=NULL,shared_location_json=NULL,deleted_at=?,deleted_by_id=?,deleted_by_name=? WHERE id=?;",[deletedAt,deletedBy.id,deletedBy.name,messageId]);await OutboxRepository.enqueue('local_chat_messages',messageId,'UPDATE',{id:messageId,text:'',attachment:null,reactions:{},sharedLocation:null,deletedAt,deletedById:deletedBy.id,deletedByName:deletedBy.name})}
+  private static async ensureDeleteMetadata(){await this.db.execAsync('ALTER TABLE local_chat_messages ADD COLUMN deleted_by_id TEXT;').catch(()=>{});await this.db.execAsync('ALTER TABLE local_chat_messages ADD COLUMN deleted_by_name TEXT;').catch(()=>{});await this.db.execAsync('CREATE TABLE IF NOT EXISTS local_chat_hidden_messages (message_id TEXT NOT NULL,user_id TEXT NOT NULL,hidden_at TEXT NOT NULL,PRIMARY KEY(message_id,user_id));');}
+  static async deleteForMe(messageIds:string[],userId:string):Promise<void>{await this.ensureDeleteMetadata();const now=new Date().toISOString();for(const id of messageIds)await this.db.runAsync('INSERT OR REPLACE INTO local_chat_hidden_messages(message_id,user_id,hidden_at) VALUES(?,?,?);',[id,userId,now]);}
+  static async deleteManyForEveryone(messageIds:string[],deletedBy:{id:string;name:string}):Promise<void>{for(const id of messageIds)await this.deleteMessage(id,deletedBy);}
 
   static async togglePin(messageId: string, isPinned: boolean): Promise<boolean> {
     await this.db.runAsync(
