@@ -3,6 +3,7 @@ import type { Session } from '@supabase/supabase-js';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { router, usePathname } from 'expo-router';
 import { nativeSupabase } from './supabase';
+import { clearSessionWindow, isSessionWindowExpired, rememberSessionWindow } from './authStorage';
 
 const PUBLIC_ROUTES = new Set(['/sign-in', '/register', '/forgot-password', '/verify-account', '/reset-password']);
 
@@ -13,16 +14,22 @@ export function AuthGate({ children }: PropsWithChildren) {
 
   useEffect(() => {
     let alive = true;
-    nativeSupabase.auth.getSession().then(({ data, error }) => {
+    (async()=>{
+      const {data,error}=await nativeSupabase.auth.getSession();
+      if(!alive)return;
+      if(error)console.warn('Could not restore authentication session',error);
+      let restored=data.session??null;
+      if(restored){
+        if(await isSessionWindowExpired()){await nativeSupabase.auth.signOut();await clearSessionWindow();restored=null}
+        else await rememberSessionWindow();
+      }
+      setSession(restored);setResolved(true);
+    })();
+    const { data } = nativeSupabase.auth.onAuthStateChange((event, nextSession) => {
       if (!alive) return;
-      if (error) console.warn('Could not restore authentication session', error);
-      setSession(data.session ?? null);
-      setResolved(true);
-    });
-    const { data } = nativeSupabase.auth.onAuthStateChange((_event, nextSession) => {
-      if (!alive) return;
-      setSession(nextSession);
-      setResolved(true);
+      if(nextSession)rememberSessionWindow().catch(()=>{});
+      else if(event==='SIGNED_OUT')clearSessionWindow().catch(()=>{});
+      setSession(nextSession);setResolved(true);
     });
     return () => { alive = false; data.subscription.unsubscribe(); };
   }, []);
