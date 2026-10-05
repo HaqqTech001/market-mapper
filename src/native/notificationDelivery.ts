@@ -40,7 +40,6 @@ export async function initializeOperationalNotifications() {
       description: 'Mission, assignment, role and other Market Mapper operational alerts',
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 180, 120, 280],
-      sound: 'default',
       enableVibrate: true,
       showBadge: true,
     });
@@ -74,7 +73,7 @@ export async function presentOperationalNotification(payload: OperationalNotific
     content: {
       title: payload.title,
       body: payload.body,
-      sound: 'default',
+      sound: true,
       data: {
         notificationId: payload.id,
         entityReferenceType: payload.entityReferenceType ?? null,
