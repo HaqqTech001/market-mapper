@@ -30,9 +30,29 @@ async function ensureCloudChatChannel(channelId:string){
  const db=getDatabase();
  const row=await db.getFirstAsync<any>('SELECT id,name,channel_type,team_id,mission_id,created_at FROM local_chat_channels WHERE id=?;',[channelId]);
  if(!row)throw new Error('CHAT_CHANNEL_MISSING_LOCAL:'+channelId);
+
+ // Do not UPSERT an existing channel here. PostgreSQL ON CONFLICT enters an
+ // UPDATE path, which legitimately requires an UPDATE RLS policy and caused
+ // ordinary message delivery to fail with 42501. A message only needs its
+ // parent channel to exist.
+ const {data:existing,error:lookupError}=await nativeSupabase
+   .from('chat_channels').select('id').eq('id',channelId).maybeSingle();
+ if(lookupError)throw lookupError;
+ if(existing?.id)return;
+
  const payload={id:row.id,name:row.name,channel_type:row.channel_type,team_id:row.team_id||null,mission_id:row.mission_id||null,created_at:row.created_at};
- const {error}=await nativeSupabase.from('chat_channels').upsert(payload,{onConflict:'id'});
- if(error)throw error;
+ const {error}=await nativeSupabase.from('chat_channels').insert(payload);
+ // A concurrent client may create the same canonical channel between our
+ // lookup and insert. In that case re-read it rather than turning it into a
+ // destructive/privileged update.
+ if(error){
+   if(error.code==='23505'){
+     const {data:after,error:afterError}=await nativeSupabase.from('chat_channels').select('id').eq('id',channelId).maybeSingle();
+     if(afterError)throw afterError;
+     if(after?.id)return;
+   }
+   throw error;
+ }
 }
 
 async function upsertChatMessageCompatible(mapped:Payload){
@@ -114,6 +134,15 @@ async function apply(item:OutboxQueueItem){
    if(p.connectedTargetJunctionId!==undefined)mapped.connected_target_junction_id=p.connectedTargetJunctionId;
  } else mapped=target.map(p);
  if(item.tableName==='local_chat_messages' && item.action==='INSERT'){await ensureCloudChatChannel(String(mapped.channel_id));await upsertChatMessageCompatible(mapped);return;}
+ if(item.tableName==='local_chat_channels' && item.action==='INSERT'){
+   const {data:existing,error:lookupError}=await nativeSupabase.from('chat_channels').select('id').eq('id',item.recordId).maybeSingle();
+   if(lookupError)throw lookupError;
+   if(existing?.id)return;
+   const {error}=await nativeSupabase.from('chat_channels').insert(mapped);
+   if(error?.code==='23505')return;
+   if(error)throw error;
+   return;
+ }
  const query=item.action==='DELETE'?nativeSupabase.from(target.table).delete().eq('id',item.recordId):item.action==='UPDATE'?nativeSupabase.from(target.table).update(mapped).eq('id',item.recordId):nativeSupabase.from(target.table).upsert(mapped,{onConflict:'id'});
  const {error}=await query; if(error)throw error;
 }
