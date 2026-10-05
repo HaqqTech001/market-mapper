@@ -9,9 +9,16 @@ export async function hydrateChatFromCloud(): Promise<{channels:number;messages:
   const db=getDatabase();
   const {data:channels,error:channelError}=await nativeSupabase
     .from('chat_channels')
-    .select('id,name,channel_type,team_id,mission_id,description,avatar_path,updated_at,created_at')
+    .select('id,name,channel_type,team_id,mission_id,created_at')
     .order('created_at',{ascending:true});
   if(channelError) throw channelError;
+
+  // Rich channel metadata is optional until the corresponding migration exists.
+  const richChannels=await nativeSupabase.from('chat_channels').select('id,description,avatar_path,updated_at');
+  if(!richChannels.error&&richChannels.data){
+    const meta=new Map(richChannels.data.map((x:any)=>[x.id,x]));
+    for(const channel of channels||[])Object.assign(channel,meta.get(channel.id)||{});
+  }
 
   // Legacy builds could create more than one cloud channel for the same mission.
   // Pick one stable existing cloud row per mission and collapse the local cache to it.
