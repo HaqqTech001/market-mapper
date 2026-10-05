@@ -26,6 +26,22 @@ function mapMission(p:Payload){return {id:p.id,market_id:p.marketId||null,title:
 function mapCatalogueSuggestion(p:Payload){return {id:p.id,suggested_by:p.suggestedBy,name:p.name,item_type:p.itemType,suggested_category_id:p.suggestedCategoryId||null,notes:p.reviewerNotes||p.notes||null,status:'pending',created_at:p.createdAt};}
 function mapNotification(p:Payload){return {id:p.id,recipient_id:p.recipientId,type:p.type,title:p.title,body:p.body,entity_reference_type:p.entityReferenceType||null,entity_reference_id:p.entityReferenceId||null,is_read:!!p.isRead,created_at:p.createdAt};}
 
+async function upsertChatMessageCompatible(mapped:Payload){
+ let candidate={...mapped};
+ for(let attempt=0;attempt<12;attempt++){
+   const {error}=await nativeSupabase.from('chat_messages').upsert(candidate,{onConflict:'id'});
+   if(!error)return;
+   const text=[error.message,error.details,error.hint].filter(Boolean).join(' ');
+   const match=text.match(/(?:column|field) ['"]?([a-zA-Z0-9_]+)['"]?/i) || text.match(/Could not find the ['"]?([a-zA-Z0-9_]+)['"]? column/i);
+   const missing=match?.[1];
+   if(missing && missing in candidate && !['id','channel_id','sender_id','sender_name','sender_role','text','created_at'].includes(missing)){
+     delete candidate[missing]; continue;
+   }
+   throw error;
+ }
+ throw new Error('CHAT_MESSAGE_SCHEMA_INCOMPATIBLE');
+}
+
 async function apply(item:OutboxQueueItem){
  const p:Payload=JSON.parse(item.payload);
  if(item.tableName==='local_notifications' && item.action==='INSERT'){
@@ -84,6 +100,7 @@ async function apply(item:OutboxQueueItem){
    if(p.connectedPathId!==undefined)mapped.connected_path_id=p.connectedPathId;
    if(p.connectedTargetJunctionId!==undefined)mapped.connected_target_junction_id=p.connectedTargetJunctionId;
  } else mapped=target.map(p);
+ if(item.tableName==='local_chat_messages' && item.action==='INSERT'){await upsertChatMessageCompatible(mapped);return;}
  const query=item.action==='DELETE'?nativeSupabase.from(target.table).delete().eq('id',item.recordId):item.action==='UPDATE'?nativeSupabase.from(target.table).update(mapped).eq('id',item.recordId):nativeSupabase.from(target.table).upsert(mapped,{onConflict:'id'});
  const {error}=await query; if(error)throw error;
 }
