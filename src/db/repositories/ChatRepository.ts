@@ -305,6 +305,14 @@ export class ChatRepository {
     const msgs = await this.getMessages(channelId);
     return msgs.filter((m) => m.isPinned);
   }
+  static async getUnreadMessageIds(channelId:string,userId:string):Promise<string[]>{
+    const rows=await this.db.getAllAsync<any>(`SELECT m.id FROM local_chat_messages m
+      LEFT JOIN local_chat_message_receipts r ON r.message_id=m.id AND r.user_id=?
+      WHERE m.channel_id=? AND m.sender_id<>? AND r.read_at IS NULL
+      ORDER BY m.created_at ASC;`,[userId,channelId,userId]);
+    return rows.map(r=>String(r.id));
+  }
+
   static async markChannelRead(channelId:string,userId:string):Promise<void>{
     const now=new Date().toISOString();
     const rows=await this.db.getAllAsync<any>('SELECT id,sender_id FROM local_chat_messages WHERE channel_id=?;',[channelId]);
