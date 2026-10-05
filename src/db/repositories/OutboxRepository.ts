@@ -65,7 +65,7 @@ export class OutboxRepository {
   static async markFailed(id: string, errorMessage: string): Promise<void> {
     await this.db.runAsync(
       `UPDATE local_outbox_queue SET
-        status = 'failed', error_message = ?, retry_count = retry_count + 1
+        status = CASE WHEN retry_count + 1 >= 20 THEN 'failed' ELSE 'pending' END, error_message = ?, retry_count = retry_count + 1
        WHERE id = ?;`,
       [errorMessage, id]
     );
@@ -97,8 +97,8 @@ export class OutboxRepository {
   }
 
   static async retryFailed(id?: string): Promise<void> {
-    if (id) await this.db.runAsync(`UPDATE local_outbox_queue SET status = 'pending', error_message = NULL WHERE id = ? AND status = 'failed';`, [id]);
-    else await this.db.runAsync(`UPDATE local_outbox_queue SET status = 'pending', error_message = NULL WHERE status = 'failed' AND retry_count < 20;`);
+    if (id) await this.db.runAsync(`UPDATE local_outbox_queue SET status = 'pending', error_message = NULL, retry_count = 0 WHERE id = ? AND status = 'failed';`, [id]);
+    else await this.db.runAsync(`UPDATE local_outbox_queue SET status = 'pending', error_message = NULL, retry_count = 0 WHERE status = 'failed';`);
   }
 
   static async getQueue(limit = 200): Promise<OutboxQueueItem[]> {
