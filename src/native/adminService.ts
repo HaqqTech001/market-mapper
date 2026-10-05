@@ -117,7 +117,24 @@ export async function updateAdminMission(missionId:string,input:{title?:string;d
 }
 export async function deleteAdminMission(missionId:string){
  await requireAdmin();
- // DB FKs cascade mission members, assignments and mission chat rows. This is
- // intentionally a cloud delete first so deleted missions cannot rehydrate.
+ // Do not rely on historical FK cascades: older deployed schemas may not have
+ // them. Remove the mission conversation explicitly before deleting the mission.
+ const {data:channels,error:channelLookupError}=await nativeSupabase.from('chat_channels').select('id').eq('mission_id',missionId);
+ if(channelLookupError)throw channelLookupError;
+ const channelIds=(channels||[]).map((x:any)=>x.id);
+ if(channelIds.length){
+   const {data:messageRows,error:messageLookupError}=await nativeSupabase.from('chat_messages').select('id').in('channel_id',channelIds);
+   if(messageLookupError)throw messageLookupError;
+   const messageIds=(messageRows||[]).map((x:any)=>x.id);
+   if(messageIds.length){
+     // Receipts are optional on older deployments.
+     const receiptDelete=await nativeSupabase.from('chat_message_receipts').delete().in('message_id',messageIds);
+     if(receiptDelete.error && receiptDelete.error.code!=='PGRST205')throw receiptDelete.error;
+   }
+   const messageDelete=await nativeSupabase.from('chat_messages').delete().in('channel_id',channelIds);
+   if(messageDelete.error)throw messageDelete.error;
+   const channelDelete=await nativeSupabase.from('chat_channels').delete().in('id',channelIds);
+   if(channelDelete.error)throw channelDelete.error;
+ }
  const {error}=await nativeSupabase.from('missions').delete().eq('id',missionId);if(error)throw error;
 }
