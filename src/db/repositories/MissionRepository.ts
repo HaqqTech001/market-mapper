@@ -209,6 +209,35 @@ export class MissionRepository {
     return updated;
   }
 
+  static async finishMission(id:string):Promise<{ok:boolean;reason?:string}>{
+    const mission=await this.getMissionById(id);if(!mission)return {ok:false,reason:'Mission not found'};
+    const progress=await this.calculateMissionProgress(id);
+    if(progress.openIssuesCount>0)return {ok:false,reason:`Resolve ${progress.openIssuesCount} open field issue(s) before finishing.`};
+    if(progress.totalAreas>0&&progress.areasCompleted<progress.totalAreas)return {ok:false,reason:`Complete all assigned areas first (${progress.areasCompleted}/${progress.totalAreas}).`};
+    await this.updateMissionStatus(id,'completed');
+    return {ok:true};
+  }
+
+  static async deleteMission(id:string):Promise<boolean>{
+    const current=await this.getMissionById(id);if(!current)return false;
+    // Local dependent mission records are removed transactionally by explicit
+    // mission id so an abandoned draft cannot leave ghost coordination data.
+    await this.db.execAsync('BEGIN IMMEDIATE;');
+    try{
+      for(const table of ['local_chat_message_receipts']){
+        if(table==='local_chat_message_receipts')await this.db.runAsync("DELETE FROM local_chat_message_receipts WHERE message_id IN (SELECT id FROM local_chat_messages WHERE channel_id IN (SELECT id FROM local_chat_channels WHERE mission_id=?));",[id]);
+      }
+      await this.db.runAsync("DELETE FROM local_chat_messages WHERE channel_id IN (SELECT id FROM local_chat_channels WHERE mission_id=?);",[id]);
+      await this.db.runAsync("DELETE FROM local_chat_channels WHERE mission_id=?;",[id]);
+      await this.db.runAsync("DELETE FROM local_mission_area_assignments WHERE mission_id=?;",[id]);
+      await this.db.runAsync("DELETE FROM local_mission_members WHERE mission_id=?;",[id]);
+      await this.db.runAsync("DELETE FROM local_missions WHERE id=?;",[id]);
+      await this.db.execAsync('COMMIT;');
+    }catch(error){await this.db.execAsync('ROLLBACK;');throw error}
+    await OutboxRepository.enqueue('local_missions',id,'DELETE',{id});
+    return true;
+  }
+
   // --- Members & Team Assignment ---
   static async addMember(
     missionId: string,
