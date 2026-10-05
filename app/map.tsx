@@ -214,7 +214,7 @@ export default function MapScreen() {
         )}
       </View>
       {mission && userContext ? <RemainingBranchesSheet visible={showBranches} missionId={mission.id} userId={userContext.userId} onClose={() => setShowBranches(false)} onSelect={({junction, branch}) => setBranchTarget({ branchId: branch.id, label: `${junction.operationalLabel} · ${branch.label}`, latitude: junction.latitude, longitude: junction.longitude })} /> : null}
-      <NativeBusinessCapture visible={capture === 'business'} onClose={() => setCapture(null)} onSave={async (value: BusinessCaptureValue) => {
+      <NativeBusinessCapture visible={capture === 'business'} suggestedBy={userContext?.userId} onClose={() => setCapture(null)} onSave={async (value: BusinessCaptureValue) => {
         if (!current || !snapshot.missionId || !userContext) throw new Error('Mapping context is unavailable.');
         const before = recorder.getSnapshot().status;
         const savedBusiness = await saveQuickBusiness({ missionId: snapshot.missionId, userId: userContext.userId, pathSessionId: snapshot.sessionId, latitude: current.latitude, longitude: current.longitude }, { ...value, photoDeclined: value.photoDeclined, localPhotoUri: value.photo?.localUri });
