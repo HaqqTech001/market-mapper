@@ -71,6 +71,35 @@ export const MINIMAL_DEV_CATALOGUE_ITEMS: DevSeedCatalogueItem[] = [
     aliases: ['Palm oil', 'Groundnut oil', 'Vegetable oil', 'Epo pupa', 'Red oil', 'Cooking oil'],
   },
 
+  {
+    id: 'item_biscuits_snacks',
+    name: 'Biscuits, Cookies & Crackers',
+    itemType: 'product',
+    primaryCategoryId: 'cat_foodstuffs',
+    aliases: ['Biscuit','Biscuits','Cookies','Crackers','Cabin biscuit','Cream biscuit','Digestive biscuit','Wafer'],
+  },
+  {
+    id: 'item_confectionery',
+    name: 'Sweets, Candy & Confectionery',
+    itemType: 'product',
+    primaryCategoryId: 'cat_foodstuffs',
+    aliases: ['Sweet','Sweets','Candy','Chewing gum','Chocolate','Lollipop'],
+  },
+  {
+    id: 'item_packaged_drinks',
+    name: 'Soft Drinks, Water & Packaged Beverages',
+    itemType: 'product',
+    primaryCategoryId: 'cat_foodstuffs',
+    aliases: ['Soft drink','Mineral','Water','Bottled water','Malt','Juice','Soda'],
+  },
+  {
+    id: 'item_noodles_pasta',
+    name: 'Noodles, Pasta & Packaged Foods',
+    itemType: 'product',
+    primaryCategoryId: 'cat_foodstuffs',
+    aliases: ['Noodles','Indomie','Spaghetti','Macaroni','Pasta'],
+  },
+
   // 2. Phones & Tech (Recharge card, Phone repair, Screens, Chargers)
   {
     id: 'item_recharge_card',
@@ -192,10 +221,9 @@ export const MINIMAL_DEV_CATALOGUE_ITEMS: DevSeedCatalogueItem[] = [
  * Seeds minimal development testing records into local SQLite
  */
 export async function seedInitialCatalogue(db: DatabaseAdapter): Promise<void> {
-  const existing = await db.getAllAsync('SELECT id FROM local_categories LIMIT 1;');
-  if (existing && existing.length > 0) {
-    return; // Already initialized
-  }
+  // Idempotent upserts below deliberately run on existing installations too.
+  // This lets catalogue coverage improve without deleting field data or requiring
+  // users to clear the application database.
 
   const now = new Date().toISOString();
 
