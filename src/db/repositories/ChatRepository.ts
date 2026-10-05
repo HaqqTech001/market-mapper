@@ -110,23 +110,32 @@ export class ChatRepository {
   }
 
   static async getAllChannels(): Promise<ChatChannel[]> {
-    const rows = await this.db.getAllAsync<any>(
-      `SELECT * FROM local_chat_channels ORDER BY created_at ASC;`
+    // Channel preview fields are derived cache. Rebuild them from durable
+    // messages so a hydrated conversation can never display "No messages yet".
+    await this.db.runAsync(`UPDATE local_chat_channels SET
+      last_message_snippet=COALESCE((SELECT CASE
+        WHEN m.deleted_at IS NOT NULL THEN 'Message deleted'
+        WHEN NULLIF(TRIM(m.text),'') IS NOT NULL THEN m.text
+        WHEN m.shared_location_json IS NOT NULL THEN 'Shared a location'
+        WHEN m.message_type='image' THEN 'Photo'
+        WHEN m.message_type='video' THEN 'Video'
+        WHEN m.message_type='audio' THEN 'Voice note'
+        WHEN m.message_type='file' THEN 'Document'
+        ELSE 'Message' END FROM local_chat_messages m
+        WHERE m.channel_id=local_chat_channels.id ORDER BY m.created_at DESC LIMIT 1),last_message_snippet),
+      last_message_time=COALESCE((SELECT m.created_at FROM local_chat_messages m
+        WHERE m.channel_id=local_chat_channels.id ORDER BY m.created_at DESC LIMIT 1),last_message_time);`);
+    const rows=await this.db.getAllAsync<any>(
+      `SELECT * FROM local_chat_channels ORDER BY COALESCE(last_message_time,created_at) DESC;`
     );
-
-    return rows.map((r) => ({
-      id: r.id,
-      name: r.name,
-      channelType: r.channel_type || r.channelType,
-      teamId: r.team_id || r.teamId,
-      missionId: r.mission_id || r.missionId,
-      unreadCount: Number(r.unread_count || 0),
-      lastMessageSnippet: r.last_message_snippet || r.lastMessageSnippet,
-      lastMessageTime: r.last_message_time || r.lastMessageTime,
-      createdAt: r.created_at || r.createdAt,
-      description: r.description || undefined,
-      avatarPath: r.avatar_path || undefined,
-      updatedAt: r.updated_at || undefined,
+    return rows.map((r)=>({
+      id:r.id,name:r.name,channelType:r.channel_type||r.channelType,
+      teamId:r.team_id||r.teamId,missionId:r.mission_id||r.missionId,
+      unreadCount:Number(r.unread_count||0),
+      lastMessageSnippet:r.last_message_snippet||r.lastMessageSnippet,
+      lastMessageTime:r.last_message_time||r.lastMessageTime,
+      createdAt:r.created_at||r.createdAt,description:r.description||undefined,
+      avatarPath:r.avatar_path||undefined,updatedAt:r.updated_at||undefined,
     }));
   }
 
