@@ -29,7 +29,17 @@ import { hydrateChatFromCloud } from '@/src/native/chatCloudSync';
 
 export default function ChatScreen(){
  const [imageViewer,setImageViewer]=useState<ChatMessage|null>(null); const [locationViewer,setLocationViewer]=useState<{latitude:number;longitude:number;label:string}|null>(null); const [actionMessage,setActionMessage]=useState<ChatMessage|null>(null); const [editTarget,setEditTarget]=useState<ChatMessage|null>(null); const [user,setUser]=useState<NativeUserContext|null>(null); const [channels,setChannels]=useState<ChatChannel[]>([]); const [active,setActive]=useState<ChatChannel|null>(null); const [messages,setMessages]=useState<ChatMessage[]>([]); const [text,setText]=useState(''); const [loading,setLoading]=useState(true); const [emoji,setEmoji]=useState(false); const [attach,setAttach]=useState(false); const [info,setInfo]=useState(false); const [reply,setReply]=useState<ChatMessage|null>(null); const [downloadState,setDownloadState]=useState<Record<string,{status:string;progress:number}>>({}); const [reactionTarget,setReactionTarget]=useState<ChatMessage|null>(null); const [infoMessage,setInfoMessage]=useState<ChatMessage|null>(null); const [receiptRows,setReceiptRows]=useState<Awaited<ReturnType<typeof ChatRepository.getMessageReceipts>>>([]); const [participants,setParticipants]=useState<Array<{id:string;name:string;role:any}>>([]); const [receiptStates,setReceiptStates]=useState<Record<string,'sent'|'delivered'|'read'>>({}); const scroll=useRef<ScrollView>(null);
- const loadChannels=useCallback(async()=>{try{await hydrateChatFromCloud()}catch{}const all=await ChatRepository.getAllChannels();setChannels(all);if(active){setMessages(await ChatRepository.getMessages(active.id))}},[active]);
+ const loadChannels=useCallback(async()=>{
+   // Render durable SQLite immediately. Cloud hydration is additive and must
+   // never gate or blank locally-saved messages.
+   const local=await ChatRepository.getAllChannels();setChannels(local);
+   if(active)setMessages(await ChatRepository.getMessages(active.id));
+   try{
+     await hydrateChatFromCloud();
+     const merged=await ChatRepository.getAllChannels();setChannels(merged);
+     if(active)setMessages(await ChatRepository.getMessages(active.id));
+   }catch(error){console.warn('Chat cloud hydration unavailable; preserving local history',error)}
+ },[active]);
  useFocusEffect(useCallback(()=>{loadChannels();return subscribeOperationalData(()=>{loadChannels()})},[loadChannels]));
  useEffect(()=>{let mounted=true;(async()=>{try{const u=await requireNativeUserContext();if(!mounted)return;setUser(u);await ChatRepository.getOrCreateChannel('General Chat','general');const missions=await getAssignedNativeMissions(u.userId);for(const m of missions)await ChatRepository.getOrCreateChannel(m.title+' Comms','mission',undefined,m.id);await loadChannels()}finally{if(mounted)setLoading(false)}})();return()=>{mounted=false}},[]);
  const openAttachment=async(m:ChatMessage)=>{const a=m.attachment;if(!a)return;try{if(a.localUri){const uri=Platform.OS==='android'&&a.localUri.startsWith('file:')?await FileSystem.getContentUriAsync(a.localUri):a.localUri;await Linking.openURL(uri);return}if(a.remotePath){const local=await downloadChatAttachment({messageId:m.id,remotePath:a.remotePath,name:a.name});const uri=Platform.OS==='android'&&local.startsWith('file:')?await FileSystem.getContentUriAsync(local):local;await Linking.openURL(uri);setMessages(active?await ChatRepository.getMessages(active.id):messages)}}catch(error){Alert.alert('Could not open attachment',chatUserMessage(error,'This attachment could not be opened.'))}};
