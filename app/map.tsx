@@ -17,6 +17,7 @@ import { ReviewRestartSheet } from '@/src/native/ReviewRestartSheet';
 import type { LocalPathJunction, RawGpsSample } from '@/src/types';
 import { PathRepository } from '@/src/db/repositories/PathRepository';
 import { getNativeSyncSnapshot, retryNativeSync, runNativeSync, type NativeSyncSnapshot } from '@/src/native/syncCoordinator';
+import { CaptureDraftRepository } from '@/src/db/repositories/CaptureDraftRepository';
 
 const recorder = new NativePathRecorder();
 
@@ -97,6 +98,10 @@ export default function MapScreen() {
         const missions = await getAssignedNativeMissions(user.userId);
         setMission(missions[0] ?? null);
         if (missions.length === 0) setContextError('NO_ASSIGNED_MISSION');
+        // An active draft means capture was interrupted (process death/crash/
+        // accidental close). Restore it automatically. Intentionally parked
+        // "saved_later" drafts remain parked until the mapper chooses Resume.
+        if(await CaptureDraftRepository.hasActiveBusiness())setCapture('business');
       } catch (error) {
         setContextError(error instanceof Error ? error.message : 'AUTH_REQUIRED');
         console.error('Native user context failed', error);
@@ -214,7 +219,7 @@ export default function MapScreen() {
         )}
       </View>
       {mission && userContext ? <RemainingBranchesSheet visible={showBranches} missionId={mission.id} userId={userContext.userId} onClose={() => setShowBranches(false)} onSelect={({junction, branch}) => setBranchTarget({ branchId: branch.id, label: `${junction.operationalLabel} · ${branch.label}`, latitude: junction.latitude, longitude: junction.longitude })} /> : null}
-      <NativeBusinessCapture visible={capture === 'business'} suggestedBy={userContext?.userId} onClose={() => setCapture(null)} onSave={async (value: BusinessCaptureValue) => {
+      <NativeBusinessCapture visible={capture === 'business'} suggestedBy={userContext?.userId} captureContext={{missionId:snapshot.missionId||undefined,pathSessionId:snapshot.sessionId||undefined,latitude:current?.latitude,longitude:current?.longitude}} onClose={() => setCapture(null)} onSave={async (value: BusinessCaptureValue) => {
         if (!current || !snapshot.missionId || !userContext) throw new Error('Mapping context is unavailable.');
         const before = recorder.getSnapshot().status;
         const savedBusiness = await saveQuickBusiness({ missionId: snapshot.missionId, userId: userContext.userId, pathSessionId: snapshot.sessionId, latitude: current.latitude, longitude: current.longitude }, { ...value, photoDeclined: value.photoDeclined, localPhotoUri: value.photo?.localUri });
