@@ -810,6 +810,8 @@ export interface ChatMessage {
   reactions?: Record<string,string[]>;
   editedAt?: string;
   deletedAt?: string;
+  deletedById?: string;
+  deletedByName?: string;
   isPinned: boolean;
   linkedBusinessId?: string;
   linkedBusinessName?: string;
